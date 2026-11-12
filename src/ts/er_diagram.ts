@@ -161,55 +161,55 @@ export class SastryERDiagram {
       });
     }
 
-    // Table clicks inside viewport (card header clicks or foreign key clicks)
+    // Table clicks inside viewport (clicking any other table selects it and moves it to right)
     if (this.nodesLayer) {
       this.nodesLayer.addEventListener('click', (e: MouseEvent) => {
         const target = e.target as HTMLElement;
+        const clickedCard = target.closest('.er-table-card') as HTMLElement | null;
+        if (!clickedCard) return;
 
-        // 1. Check if header of a related table was clicked
-        const relatedHeader = target.closest('.er-table-card.has-many-table .er-table-header, .er-table-card.foreign-table .er-table-header');
-        if (relatedHeader) {
-          const card = relatedHeader.closest('.er-table-card') as HTMLElement | null;
-          const fullLabel = card?.dataset.label; // e.g. "customer.Customer"
-          if (fullLabel && fullLabel.includes('.')) {
-            const [app, mdl] = fullLabel.split('.');
+        const isActiveTable = clickedCard.classList.contains('active-table');
+        const cardTableKey = clickedCard.dataset.label; // e.g. "epic.Kingdom"
+
+        // 1. Clicked on ANY other table on the canvas (not active table):
+        if (!isActiveTable) {
+          // Check if specifically clicked on a foreign key badge pointing to a 3rd model:
+          const fieldRow = target.closest('.er-field-row') as HTMLElement | null;
+          if (fieldRow) {
+            const colType = fieldRow.dataset.type;
+            const kind = fieldRow.dataset.kind;
+            if (colType === 'ForeignKey' && kind && kind.includes('.')) {
+              const [targetApp, targetModel] = kind.split('.');
+              this.loadModel(targetApp, targetModel);
+              return;
+            }
+          }
+          // Clicking anywhere on this table makes it the selected table and moves it to right!
+          if (cardTableKey && cardTableKey.includes('.')) {
+            const [app, mdl] = cardTableKey.split('.');
             this.loadModel(app, mdl);
             return;
           }
         }
 
-        // 2. Check if a field row inside any table was clicked
+        // 2. Clicked inside the active table (selected table on the right):
         const fieldRow = target.closest('.er-field-row') as HTMLElement | null;
         if (fieldRow) {
           const colType = fieldRow.dataset.type;
           const kind = fieldRow.dataset.kind;
           const fieldName = fieldRow.dataset.field;
-          const card = fieldRow.closest('.er-table-card') as HTMLElement | null;
-          const isActiveTable = card?.classList.contains('active-table');
 
-          // If foreign key with a target model was clicked:
           if (colType === 'ForeignKey' && kind && kind.includes('.')) {
             const [targetApp, targetModel] = kind.split('.');
-
-            // Case A: Clicked inside a related table card (e.g. Kingdom.dynasty -> Dynasty)
-            // Immediately navigate and show that related model!
-            if (!isActiveTable) {
-              this.loadModel(targetApp, targetModel);
-              return;
-            }
-
-            // Case B: Clicked inside the active table card (e.g. Event.location -> Kingdom)
             const clickedBadge = !!target.closest('.er-fk-badge');
             const targetCard = document.getElementById(`er-card-${kind.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
 
-            // If clicked badge directly, or target card not on canvas, or clicked same FK again:
             if (clickedBadge || !targetCard || this.lastClickedFk === fieldName) {
               this.lastClickedFk = null;
               this.loadModel(targetApp, targetModel);
               return;
             }
 
-            // First click on active row: select field in inspector and highlight & scroll to related table
             this.lastClickedFk = fieldName;
             if (fieldName) {
               this.selectField(fieldName);
@@ -218,9 +218,8 @@ export class SastryERDiagram {
             return;
           }
 
-          // Standard field in active table -> select for inspector
           this.lastClickedFk = null;
-          if (isActiveTable && fieldName) {
+          if (fieldName) {
             this.selectField(fieldName);
           }
         }
@@ -328,27 +327,27 @@ export class SastryERDiagram {
 
     const { lvt, foreign, has_many, main_table } = this.currentData;
 
-    // Build active central table card
-    const activeCard = this.createTableCard(main_table, lvt, 'active-table', 'Active Model');
+    // Build active table card (Selected Table - positioned on the FAR RIGHT)
+    const activeCard = this.createTableCard(main_table, lvt, 'active-table', 'Selected Table');
     this.nodesLayer.appendChild(activeCard);
 
-    // Build reverse relation table cards (has_many)
+    // Build reverse relation table cards (has_many / Child Tables)
     const hasManyKeys = Object.keys(has_many || {});
     hasManyKeys.forEach(relKey => {
       const relData = has_many[relKey];
-      const card = this.createTableCard(relKey, relData, 'has-many-table', 'Reverse Relation');
+      const card = this.createTableCard(relKey, relData, 'has-many-table', 'Child Table');
       this.nodesLayer!.appendChild(card);
     });
 
-    // Build outgoing foreign key table cards (foreign)
+    // Build outgoing foreign key table cards (foreign / Referenced Tables)
     const foreignKeys = Object.keys(foreign || {});
     foreignKeys.forEach(fkKey => {
       const fkData = foreign[fkKey];
-      const card = this.createTableCard(fkKey, fkData, 'foreign-table', 'Foreign Key Target');
+      const card = this.createTableCard(fkKey, fkData, 'foreign-table', 'Referenced Table');
       this.nodesLayer!.appendChild(card);
     });
 
-    // Layout cards into 3 columns (Left: has_many, Center: Active, Right: foreign)
+    // Layout cards: Selected Table on the RIGHT, related tables distributed in columns on the LEFT
     this.layoutNodes(hasManyKeys, main_table, foreignKeys);
 
     // Select primary key field or first field
@@ -373,15 +372,16 @@ export class SastryERDiagram {
 
     const shortName = tableKey.includes('.') ? tableKey.split('.')[1] : tableKey;
     const appName = tableKey.includes('.') ? tableKey.split('.')[0] : '';
+    const iconClass = cardTypeClass === 'active-table' ? 'bi-star-fill text-dark' : (cardTypeClass === 'has-many-table' ? 'bi-arrow-return-right' : 'bi-link-45deg');
 
     let headerHtml = `
       <div class="er-table-header" title="${badgeText}: ${tableKey}">
         <div class="d-flex align-items-center text-truncate">
-          <i class="bi ${cardTypeClass === 'active-table' ? 'bi-table' : (cardTypeClass === 'has-many-table' ? 'bi-arrow-left-square-fill' : 'bi-arrow-right-square-fill')} me-2"></i>
+          <i class="bi ${iconClass} me-2"></i>
           <span class="text-truncate">${shortName}</span>
           ${appName ? `<span class="opacity-75 ms-1 small" style="font-size:0.7rem">(${appName})</span>` : ''}
         </div>
-        <span class="er-table-badge">${badgeText === 'Active Model' ? (data.FieldSeq ? data.FieldSeq.length : '') : '↗'}</span>
+        <span class="er-table-badge">${cardTypeClass === 'active-table' ? 'Selected' : (cardTypeClass === 'has-many-table' ? 'Child ↗' : 'Ref ↗')}</span>
       </div>
       <div class="er-table-body">
     `;
@@ -433,50 +433,70 @@ export class SastryERDiagram {
   private layoutNodes(hasManyKeys: string[], mainTableKey: string, foreignKeys: string[]): void {
     if (!this.viewport || !this.nodesLayer) return;
 
-    const cardSpacingX = 80;
-    const cardSpacingY = 20;
-    const colWidth = 270;
+    const cardSpacingX = 60;
+    const cardSpacingY = 16;
+    const colWidth = 260;
 
     const activeCard = document.getElementById(`er-card-${mainTableKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
     if (!activeCard) return;
 
-    const leftColCount = hasManyKeys.length;
+    const totalRelated = hasManyKeys.length + foreignKeys.length;
 
-    // Calculate column X coordinates
-    const col1X = 40;
-    const col2X = leftColCount > 0 ? (col1X + colWidth + cardSpacingX) : 60;
-    const col3X = col2X + colWidth + cardSpacingX;
+    // Determine how many columns to use for related tables to the left of the selected table
+    const availableW = Math.max(this.viewport.clientWidth - colWidth - 100, 400);
+    const maxColsByWidth = Math.max(1, Math.floor(availableW / (colWidth + cardSpacingX)));
+    const numCols = totalRelated > 0 ? Math.min(maxColsByWidth, Math.max(1, Math.ceil(totalRelated / 3))) : 0;
 
-    // Position center active card
-    const activeY = 40;
-    activeCard.style.left = `${col2X}px`;
-    activeCard.style.top = `${activeY}px`;
+    // Position Selected Active Table on the FAR RIGHT
+    const selectedTableX = numCols > 0 ? (40 + numCols * (colWidth + cardSpacingX)) : 60;
+    const selectedTableY = 40;
+    activeCard.style.left = `${selectedTableX}px`;
+    activeCard.style.top = `${selectedTableY}px`;
 
-    // Position Left Cards (has_many)
-    let leftY = 40;
-    hasManyKeys.forEach(key => {
-      const card = document.getElementById(`er-card-${key.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
-      if (card) {
-        card.style.left = `${col1X}px`;
-        card.style.top = `${leftY}px`;
-        leftY += card.offsetHeight + cardSpacingY;
-      }
-    });
+    if (numCols === 0) {
+      const maxX = selectedTableX + colWidth + 80;
+      const maxY = selectedTableY + activeCard.offsetHeight + 80;
+      this.nodesLayer.style.width = `${Math.max(maxX, this.viewport.clientWidth)}px`;
+      this.nodesLayer.style.height = `${Math.max(maxY, this.viewport.clientHeight)}px`;
+      this.resizeCanvas(Math.max(maxX, this.viewport.clientWidth), Math.max(maxY, this.viewport.clientHeight));
+      return;
+    }
 
-    // Position Right Cards (foreign)
-    let rightY = 40;
-    foreignKeys.forEach(key => {
-      const card = document.getElementById(`er-card-${key.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
-      if (card) {
-        card.style.left = `${col3X}px`;
-        card.style.top = `${rightY}px`;
-        rightY += card.offsetHeight + cardSpacingY;
-      }
-    });
+    // Initialize column Y heights (starting at 40px)
+    const colHeights = new Array(numCols).fill(40);
 
-    // Compute bounding canvas dimensions
-    const maxY = Math.max(leftY, rightY, activeY + activeCard.offsetHeight) + 100;
-    const maxX = col3X + colWidth + 100;
+    // Place related table cards using bin-packing (preferring columns closer to the right / selected table)
+    const placeTables = (keys: string[]) => {
+      keys.forEach(key => {
+        const card = document.getElementById(`er-card-${key.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
+        if (!card) return;
+
+        // Find column with minimum height (tie-break: choose higher column index, i.e. closer to selected table)
+        let bestCol = numCols - 1;
+        let minH = colHeights[numCols - 1];
+        for (let c = numCols - 1; c >= 0; c--) {
+          if (colHeights[c] < minH) {
+            minH = colHeights[c];
+            bestCol = c;
+          }
+        }
+
+        const cardX = 40 + bestCol * (colWidth + cardSpacingX);
+        const cardY = colHeights[bestCol];
+        card.style.left = `${cardX}px`;
+        card.style.top = `${cardY}px`;
+        colHeights[bestCol] += card.offsetHeight + cardSpacingY;
+      });
+    };
+
+    // Place Child Tables (has_many) first, then Foreign Tables
+    placeTables(hasManyKeys);
+    placeTables(foreignKeys);
+
+    // Compute total canvas dimensions
+    const maxColHeight = Math.max(...colHeights, selectedTableY + activeCard.offsetHeight);
+    const maxX = selectedTableX + colWidth + 80;
+    const maxY = maxColHeight + 80;
 
     this.nodesLayer.style.width = `${Math.max(maxX, this.viewport.clientWidth)}px`;
     this.nodesLayer.style.height = `${Math.max(maxY, this.viewport.clientHeight)}px`;
@@ -595,9 +615,12 @@ export class SastryERDiagram {
             const fkRect = this.getRelativeRect(fkRow);
             const targetPkRect = this.getRelativeRect(targetPkRow);
 
-            const startX = fkRect.right;
+            // Active table FK is on the right -> anchor at left edge of fkRow
+            const startX = fkRect.left;
             const startY = fkRect.top + fkRect.height / 2;
-            const endX = targetPkRect.left;
+
+            // Target table PK is on the left -> anchor at right edge of targetPkRow
+            const endX = targetPkRect.right;
             const endY = targetPkRect.top + targetPkRect.height / 2;
 
             const strokeColor = this.fkColors[colorIdx % this.fkColors.length];
@@ -607,22 +630,23 @@ export class SastryERDiagram {
             ctx.strokeStyle = strokeColor;
             ctx.fillStyle = strokeColor;
 
-            // Draw connecting bezier curve
+            // Draw connecting bezier curve going leftwards from startX to endX
+            const dist = Math.abs(startX - endX);
             ctx.beginPath();
             ctx.moveTo(startX, startY);
-            const cp1X = startX + (endX - startX) * 0.45;
+            const cp1X = startX - dist * 0.45;
             const cp1Y = startY;
-            const cp2X = startX + (endX - startX) * 0.55;
+            const cp2X = endX + dist * 0.45;
             const cp2Y = endY;
             ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
             ctx.stroke();
 
-            // Draw small circle anchor at target PK
+            // Draw small circle anchor at target PK (right edge)
             ctx.beginPath();
             ctx.arc(endX, endY, 4, 0, 2 * Math.PI);
             ctx.fill();
 
-            // Draw small dot at start FK
+            // Draw small dot at start FK (left edge)
             ctx.beginPath();
             ctx.arc(startX, startY, 3, 0, 2 * Math.PI);
             ctx.fill();

@@ -154,9 +154,22 @@
 }
 
 .er-table-card.active-table {
-  border: 2px solid #f59e0b;
+  border: 2px solid #eab308;
   width: 270px;
   z-index: 5;
+  box-shadow: 0 4px 18px rgba(234, 179, 8, 0.28);
+}
+
+.er-table-card.has-many-table,
+.er-table-card.foreign-table {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.er-table-card.has-many-table:hover,
+.er-table-card.foreign-table:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.25);
 }
 
 .er-table-header {
@@ -170,8 +183,13 @@
 }
 
 .er-table-card.active-table .er-table-header {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  color: #ffffff;
+  background: linear-gradient(135deg, #facc15, #eab308);
+  color: #1e293b;
+}
+
+.er-table-card.active-table .er-table-badge {
+  background: rgba(0, 0, 0, 0.15);
+  color: #0f172a;
 }
 
 .er-table-card.has-many-table .er-table-header {
