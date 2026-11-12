@@ -18,9 +18,28 @@ A lightweight, zero-configuration dynamic CRUD administration interface and inte
    - Paginated browsing, multi-field filtering, search, and inline record creation/editing.
    - Safe foreign key resolution with query limits preventing unbounded database loads.
 
-3. **Lightweight & Non-Intrusive**:
+3. **Modular ERP Application Foundation**:
+   - Extensible base template hierarchy (`saz3.html` -> `saz3Nav.html` -> `s_home.html`) powering enterprise suites (such as `erp.saas3.in`).
+   - Easily inject custom modules into the navigation bar (Orders, Customer, Inventory, BOM, Sales, Billing).
+   - Reusable `getData` / `mdlData` backend pipelines and subclassable frontend controllers (`class CustomerController extends db_crud`) with custom action triggers (like `#ShowExtraDetail` for Orders).
+
+4. **Lightweight & Non-Intrusive**:
    - Introspects model structure using Django's native `Model._meta` APIs in memory with zero database queries during diagram generation.
    - Zero external frontend dependencies: built with modern vanilla ES6 JavaScript and HTML5 Canvas.
+
+---
+
+## Documentation & User Manual
+
+For an in-depth walkthrough of the system, including visual diagrams, color specifications, and step-by-step guides for extending Sastry into a custom ERP application, see the official manual:
+
+👉 **[Comprehensive User Manual & ERP Extensibility Guide (docs/USER_MANUAL.md)](docs/USER_MANUAL.md)**
+
+### Manual Highlights:
+- **[Interactive Visual ER Diagram Guide](docs/USER_MANUAL.md#3-interactive-visual-er-diagram)**: Details on the right-anchored model layout, right-to-left multi-column bin packing, color conventions (Gold, Cyan, Amber), and reactive table-clicking.
+- **[Dynamic CRUD Data Grid Guide](docs/USER_MANUAL.md#4-dynamic-crud-data-grid)**: Filtering, sorting, pagination, inline edits, and foreign key optimization.
+- **[ERP Extensibility Guide](docs/USER_MANUAL.md#5-erp-extensibility-guide-the-erpsaas3in-architecture)**: How to hook custom pages from the index navbar (`s_home.html`), author custom views reusing `getData`, build offcanvas filter drawers (`FilterType`), and subclass `db_crud` to display custom buttons like `[⤢ Orders]`.
+- **[Python & JavaScript API Reference](docs/USER_MANUAL.md#7-api-reference)**: Complete function signatures and class definitions.
 
 ---
 
