@@ -35,8 +35,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/krishnamurthy/django-sastry"
-Repository = "https://github.com/krishnamurthy/django-sastry.git"
+Homepage = "https://github.com/globalkrishna/django-sastry"
+Repository = "https://github.com/globalkrishna/django-sastry.git"
 
 [tool.setuptools.packages.find]
 where = ["."]
