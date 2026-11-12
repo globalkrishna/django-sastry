@@ -125,6 +125,10 @@ urlpatterns = [
 
 Access the diagram at `http://127.0.0.1:8000/sastry/er/` (or via the **ER Diagram** button in the top navigation).
 
+<p align="center">
+  <img src="images/er_diagram_preview.png" alt="Interactive Visual ER Diagram" width="900" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+</p>
+
 ```
 +---------------------------------------------------------------------------------------------------+
 |  [Search Model...]                       (Columns: Left-to-Right)           | Selected Model Card |
@@ -510,3 +514,4 @@ For customer-facing or staff-facing ERP views, you can apply standard Django per
 
 `django-sastry` is licensed under the [MIT License](LICENSE).  
 Maintained by Krishnamurthy & the Global Multimedia team. Pull requests and feedback are welcome!
+
