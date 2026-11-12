@@ -1,0 +1,19 @@
+{
+  "name": "django-sastry",
+  "version": "1.0.0",
+  "description": "Frontend TypeScript sources for django-sastry",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "keywords": [
+    "django",
+    "crud",
+    "er-diagram"
+  ],
+  "author": "Krishnamurthy <krishna@globalmultimedia.in>",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
