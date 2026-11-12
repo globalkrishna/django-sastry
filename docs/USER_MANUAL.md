@@ -57,7 +57,7 @@ pip install django-sastry
 Or install directly from your Git repository:
 
 ```bash
-pip install git+https://github.com/krishnamurthy/django-sastry.git
+pip install git+https://github.com/globalkrishna/django-sastry.git
 ```
 
 ### Django Settings (`settings.py`)
