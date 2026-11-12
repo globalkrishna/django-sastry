@@ -46,11 +46,17 @@ class SastryIntrospectionTests(SimpleTestCase):
         self.assertIn("model", prop)
 
     def test_save_uploaded_file_fallback(self):
+        from django.core.files.storage import default_storage
+
         User = get_user_model()
         dummy_user = User(pk=999)
         test_content = ContentFile(b"test file content", name="test.txt")
         saved_name = save_uploaded_file(dummy_user, test_content)
-        self.assertTrue(bool(saved_name))
+        try:
+            self.assertTrue(bool(saved_name))
+        finally:
+            if saved_name and default_storage.exists(saved_name):
+                default_storage.delete(saved_name)
 
 
 class SastryApiTests(TestCase):

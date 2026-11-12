@@ -1,5 +1,10 @@
 # Django Sastry (django-sastry)
 
+[![CI](https://github.com/globalkrishna/django-sastry/actions/workflows/ci.yml/badge.svg)](https://github.com/globalkrishna/django-sastry/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Python Versions](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
+[![Django Versions](https://img.shields.io/badge/django-4.2%20%7C%205.0%20%7C%205.1-green)](https://www.djangoproject.com/)
+
 A lightweight, zero-configuration dynamic CRUD administration interface and interactive visual **Entity Relations (ER) Diagram** engine for Django.
 
 <p align="center">
