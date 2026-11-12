@@ -4,7 +4,7 @@ s_cru.html
 if (request.user.id in [1]) or (rd_only and k not in rd_only)
 #}
 {% if restrict %}
-{% set rstr = 'd-none' if request.user.id not in restrict else None %}
+{% set rstr = 'd-none' if (not request.user.is_superuser and request.user.id not in restrict) else None %}
 <input type="hidden" id="restrict" value="{{ restrict }}">
 {% else %}
 {% set rstr = ''%}
@@ -69,7 +69,7 @@ if (request.user.id in [1]) or (rd_only and k not in rd_only)
         {% if rel_form %}
         {% for k in rel_form.data._meta.fields %}
         {% set dis = k.name in rel_form.fields or k.column in rel_form.fields %}
-        {% if request.user.id not in [1] and rd_only and k.column in rd_only %}
+        {% if not request.user.is_superuser and rd_only and k.column in rd_only %}
         {% set dis = 'false' %}
         {% endif %}
         <th class="text-center{% if show and k.column not in show%} d-none{% endif %}"
@@ -79,7 +79,7 @@ if (request.user.id in [1]) or (rd_only and k not in rd_only)
         {% endif %}
         {% for k in mdl_form.data._meta.fields %}
         {% set dis = k.name in mdl_form.fields or k.column in mdl_form.fields %}
-        {% if request.user.id not in [1] and rd_only and k.column in rd_only %}
+        {% if not request.user.is_superuser and rd_only and k.column in rd_only %}
         {% set dis = 'false' %}
         {% endif %}
         <th class="text-center{% if show and k.column not in show%} d-none{% endif %}"
