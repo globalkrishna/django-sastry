@@ -80,6 +80,7 @@ export class SastryERDiagram {
   public activeModel: string;
   public currentData: ERDiagramPayload | null = null;
   public selectedField: string | null = null;
+  private lastClickedFk: string | null = null;
   private cache: Map<string, ERDiagramPayload> = new Map();
 
   // Color palette for foreign key connection lines
@@ -123,8 +124,8 @@ export class SastryERDiagram {
     this.currentModelTitle = document.querySelector(options.currentModelTitleSelector || '#erCurrentModelTitle');
     this.searchInput = document.querySelector(options.searchInputSelector || '#erSearchInput');
 
-    this.activeApp = options.defaultApp || 'customer';
-    this.activeModel = options.defaultModel || 'Customer';
+    this.activeApp = options.defaultApp || ((document.querySelector('.er-app-group') as HTMLElement)?.dataset.app || '');
+    this.activeModel = options.defaultModel || ((document.querySelector('.er-model-item') as HTMLElement)?.dataset.model || '');
 
     this.init();
   }
@@ -160,12 +161,12 @@ export class SastryERDiagram {
       });
     }
 
-    // Table clicks inside viewport (card header clicks to center on related table)
+    // Table clicks inside viewport (card header clicks or foreign key clicks)
     if (this.nodesLayer) {
       this.nodesLayer.addEventListener('click', (e: MouseEvent) => {
         const target = e.target as HTMLElement;
 
-        // Check if header of a related table was clicked
+        // 1. Check if header of a related table was clicked
         const relatedHeader = target.closest('.er-table-card.has-many-table .er-table-header, .er-table-card.foreign-table .er-table-header');
         if (relatedHeader) {
           const card = relatedHeader.closest('.er-table-card') as HTMLElement | null;
@@ -177,12 +178,64 @@ export class SastryERDiagram {
           }
         }
 
-        // Check if field row inside active table was clicked
-        const fieldRow = target.closest('.er-table-card.active-table .er-field-row') as HTMLElement | null;
+        // 2. Check if a field row inside any table was clicked
+        const fieldRow = target.closest('.er-field-row') as HTMLElement | null;
         if (fieldRow) {
+          const colType = fieldRow.dataset.type;
+          const kind = fieldRow.dataset.kind;
           const fieldName = fieldRow.dataset.field;
-          if (fieldName) {
+          const card = fieldRow.closest('.er-table-card') as HTMLElement | null;
+          const isActiveTable = card?.classList.contains('active-table');
+
+          // If foreign key with a target model was clicked:
+          if (colType === 'ForeignKey' && kind && kind.includes('.')) {
+            const [targetApp, targetModel] = kind.split('.');
+
+            // Case A: Clicked inside a related table card (e.g. Kingdom.dynasty -> Dynasty)
+            // Immediately navigate and show that related model!
+            if (!isActiveTable) {
+              this.loadModel(targetApp, targetModel);
+              return;
+            }
+
+            // Case B: Clicked inside the active table card (e.g. Event.location -> Kingdom)
+            const clickedBadge = !!target.closest('.er-fk-badge');
+            const targetCard = document.getElementById(`er-card-${kind.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
+
+            // If clicked badge directly, or target card not on canvas, or clicked same FK again:
+            if (clickedBadge || !targetCard || this.lastClickedFk === fieldName) {
+              this.lastClickedFk = null;
+              this.loadModel(targetApp, targetModel);
+              return;
+            }
+
+            // First click on active row: select field in inspector and highlight & scroll to related table
+            this.lastClickedFk = fieldName;
+            if (fieldName) {
+              this.selectField(fieldName);
+            }
+            this.highlightAndScrollToNode(kind);
+            return;
+          }
+
+          // Standard field in active table -> select for inspector
+          this.lastClickedFk = null;
+          if (isActiveTable && fieldName) {
             this.selectField(fieldName);
+          }
+        }
+      });
+
+      // Double click on any foreign key row immediately jumps to the related model
+      this.nodesLayer.addEventListener('dblclick', (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        const fieldRow = target.closest('.er-field-row') as HTMLElement | null;
+        if (fieldRow) {
+          const colType = fieldRow.dataset.type;
+          const kind = fieldRow.dataset.kind;
+          if (colType === 'ForeignKey' && kind && kind.includes('.')) {
+            const [targetApp, targetModel] = kind.split('.');
+            this.loadModel(targetApp, targetModel);
           }
         }
       });
@@ -350,11 +403,24 @@ export class SastryERDiagram {
       }
 
       const icon = this.icons[colType] || this.icons['Text'];
+      const isFk = colType === 'ForeignKey' && kind;
+      const shortKind = isFk ? (kind.includes('.') ? kind.split('.')[1] : kind) : '';
       headerHtml += `
-        <div class="er-field-row" data-field="${fieldName}" id="er-row-${tableKey.replace(/[^a-zA-Z0-9_-]/g, '_')}-${fieldName}">
+        <div class="er-field-row ${isFk ? 'is-foreign-key' : ''}" 
+             data-field="${fieldName}" 
+             data-type="${colType}" 
+             data-kind="${kind || ''}" 
+             data-table="${tableKey}" 
+             id="er-row-${tableKey.replace(/[^a-zA-Z0-9_-]/g, '_')}-${fieldName}">
           <span class="er-field-icon">${icon}</span>
           <span class="er-field-name ${colType === 'PrimaryKey' ? 'fw-bold' : ''}">${fieldName}</span>
-          <span class="er-field-type">${colType === 'ForeignKey' && kind ? (kind.includes('.') ? kind.split('.')[1] : kind) : colType}</span>
+          ${isFk ? `
+            <span class="er-field-type er-fk-badge" title="Show ${shortKind} model (${kind})">
+              ${shortKind} <i class="bi bi-box-arrow-in-right ms-1"></i>
+            </span>
+          ` : `
+            <span class="er-field-type">${colType}</span>
+          `}
         </div>
       `;
     });
@@ -645,7 +711,7 @@ export class SastryERDiagram {
         <div class="er-prop-group mt-3 pt-2 border-top">
           <div class="er-prop-label">Target Reference</div>
           <div class="er-prop-val mb-2 font-monospace small">${targetLabel}</div>
-          <button type="button" class="btn btn-sm btn-outline-primary w-100" onclick="(window as any).sastryER.jumpToModel('${targetLabel}')">
+          <button type="button" class="btn btn-sm btn-outline-primary w-100" onclick="window.sastryER.jumpToModel('${targetLabel}')">
             <i class="bi bi-box-arrow-in-right me-1"></i> Jump to ${targetLabel.split('.')[1] || targetLabel}
           </button>
         </div>
@@ -660,7 +726,7 @@ export class SastryERDiagram {
           <div class="er-prop-label">Referenced By (${revKeys.length} Models)</div>
           <div class="list-group list-group-flush small mt-1">
             ${revKeys.map(k => `
-              <a href="#" class="list-group-item list-group-item-action py-1 px-2 d-flex justify-content-between align-items-center" onclick="(window as any).sastryER.jumpToModel('${k}'); return false;">
+              <a href="#" class="list-group-item list-group-item-action py-1 px-2 d-flex justify-content-between align-items-center" onclick="window.sastryER.jumpToModel('${k}'); return false;">
                 <span>${k.split('.')[1] || k}</span>
                 <i class="bi bi-chevron-right text-muted" style="font-size:0.7rem"></i>
               </a>
@@ -680,6 +746,16 @@ export class SastryERDiagram {
     }
   }
 
+  public highlightAndScrollToNode(tableKey: string): void {
+    const cardId = `er-card-${tableKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    card.classList.remove('er-card-pulse');
+    void card.offsetWidth; // Force DOM reflow
+    card.classList.add('er-card-pulse');
+  }
+
   public redraw(): void {
     if (this.currentData) {
       this.render();
@@ -691,8 +767,8 @@ export class SastryERDiagram {
 document.addEventListener('DOMContentLoaded', () => {
   const container = document.getElementById('erDiagramContainer');
   if (container) {
-    const defaultApp = container.dataset.defaultApp || 'customer';
-    const defaultModel = container.dataset.defaultModel || 'Customer';
+    const defaultApp = container.dataset.defaultApp || ((document.querySelector('.er-app-group') as HTMLElement)?.dataset.app || '');
+    const defaultModel = container.dataset.defaultModel || ((document.querySelector('.er-model-item') as HTMLElement)?.dataset.model || '');
     (window as any).sastryER = new SastryERDiagram({
       defaultApp,
       defaultModel

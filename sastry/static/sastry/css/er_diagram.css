@@ -249,6 +249,60 @@
   margin-left: 6px;
 }
 
+/* Interactive Foreign Key row and badge styling */
+.er-field-row.is-foreign-key {
+  cursor: pointer !important;
+}
+
+.er-field-row.is-foreign-key:hover {
+  background-color: var(--er-row-hover);
+}
+
+.er-field-row.is-foreign-key .er-fk-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #0284c7;
+  background-color: rgba(2, 132, 199, 0.1);
+  border: 1px solid rgba(2, 132, 199, 0.25);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.er-field-row.is-foreign-key:hover .er-fk-badge,
+.er-field-row.is-foreign-key .er-fk-badge:hover {
+  background-color: #0284c7;
+  color: #ffffff !important;
+  border-color: #0284c7;
+  box-shadow: 0 1px 4px rgba(2, 132, 199, 0.35);
+}
+
+/* Card Pulse Animation when focused/highlighted */
+@keyframes erCardPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.85);
+    border-color: #0284c7;
+  }
+  50% {
+    box-shadow: 0 0 24px 6px rgba(2, 132, 199, 0.65);
+    border-color: #38bdf8;
+    transform: scale(1.03);
+  }
+  100% {
+    box-shadow: var(--er-card-shadow);
+    transform: scale(1);
+  }
+}
+
+.er-table-card.er-card-pulse {
+  animation: erCardPulse 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+  z-index: 10 !important;
+}
+
 /* Right Sidebar: Field Inspector */
 .er-sidebar-right {
   width: 290px;
