@@ -77,7 +77,7 @@ INSTALLED_APPS = [
 ]
 ```
 
-Configure your Jinja2/Django template engine so Sastry's templates in `sastry/jinja2` are resolvable:
+Configure your Jinja2 template engine so Sastry's templates in `sastry/jinja2` are resolvable:
 
 ```python
 TEMPLATES = [
@@ -96,6 +96,29 @@ TEMPLATES = [
         # ...
     },
 ]
+```
+
+Create the helper `config/jinja2.py` if not already present in your project:
+
+```python
+# config/jinja2.py
+from jinja2 import Environment
+from django.templatetags.static import static
+from django.urls import reverse
+
+def environment(**options):
+    env = Environment(**options)
+    env.globals.update({
+        "static": static,
+        "url": reverse,
+    })
+    return env
+```
+
+Collect static assets so Sastry's JavaScript and CSS bundles are available:
+
+```bash
+python manage.py collectstatic --noinput
 ```
 
 ### URL Routing (`urls.py`)
@@ -216,51 +239,58 @@ This guarantees sub-second page rendering even when referencing tables with mill
 
 ---
 
-## 5. ERP Extensibility Guide (The `erp.saas3.in` Architecture)
+## 5. Layout Customization & Enterprise Extensibility Guide
 
-`django-sastry` is designed specifically to serve as the application skeleton for custom ERP suites (such as `erp.saas3.in` with its Customer, Orders, Inventory, BOM, Sales, and Accounting modules).
+`django-sastry` can be used in two primary modes:
+1. **Standalone Out-of-the-Box**: Uses Sastry's clean, built-in Bootstrap 5 layout (`saz3.html`) and model navigation bar (`saz3Nav.html`) with zero extra configuration.
+2. **Integrated Enterprise Application**: Integrates seamlessly into an existing company design system, custom navbar, or complex ERP suite by overriding or extending its base template hierarchy.
 
 ```
                       +-------------------+
-                      |     saz3.html     |  (Base Shell: HTML5, Bootstrap 5, Theme Toggle, User Menu)
+                      |     saz3.html     |  (Base Shell: HTML5, Bootstrap 5, Theme Toggle, Brand Header)
                       +---------+---------+
                                 |
                       +---------v---------+
-                      |    saz3Nav.html   |  (Navbar Shell: Top Links, App/Model Selectors)
+                      |    saz3Nav.html   |  (Navbar Shell: Top Links, Model Selectors / Custom Menus)
                       +---------+---------+
                                 |
              +------------------+------------------+
              |                                     |
   +----------v----------+               +----------v----------+
-  |    s_admin.html     |               |     s_home.html     |
+  |    s_admin.html     |               |  custom_menu.html   |
   | (Sastry Admin View) |               | (Enterprise Nav)    |
   +----------+----------+               +----------+----------+
              |                                     |
   +----------v----------+               +----------v----------+
-  | Custom ERP Modules  |               | Custom ERP Views    |
-  | (Customer, Orders)  |               | (CustomerPage.html) |
+  | Custom App Modules  |               | Custom App Views    |
+  | (Data Tables)       |               | (DashboardPage.html)|
   +---------------------+               +---------------------+
 ```
 
 ### Template Inheritance Hierarchy
 
 - **`saz3.html`**: Root layout defining the responsive viewport, Bootstrap 5 CSS/JS, Dark/Light theme switching script, top navbar skeleton, and content blocks:
-  - `{% block title %}`
-  - `{% block mainlink %}`: Navbar items.
+  - `{% block title %}`: Page title.
+  - `{% block mainlink %}`: Navbar items and navigation header.
   - `{% block ModalBlock %}`: Modals and dialogs.
   - `{% block content %}`: Main viewport body.
   - `{% block footer %}`: Script bundles and custom modules.
-- **`saz3Nav.html`**: Extends `saz3.html` and includes `s_HomeLink.html` by default.
-- **`s_admin.html`**: Default administrative entry point for Sastry's dynamic CRUD.
+- **`saz3Nav.html`**: Extends `saz3.html` and renders model selectors, ER/CRUD toggle buttons, or custom navigation menus.
+- **`s_admin.html`**: Default administrative entry point for Sastry's dynamic CRUD data grid.
+
+#### Overriding `saz3.html` with your Project's Own Branding
+If you want Sastry to match your organization's brand, logo, or existing navigation bar:
+1. Place a `saz3.html` inside your project's Jinja2 template directory (e.g. `myproject/jinja2/saz3.html` or `app/jinja2/saz3.html`).
+2. Sastry's views will automatically inherit your branded layout while continuing to inject the dynamic CRUD tables and ER diagram into `{% block content %}`.
 
 ---
 
-### Enterprise Navigation Bar (`s_home.html`)
+### Custom Navigation Bars via `saz3Nav.html` (`madmin`)
 
-In your custom ERP application, you can create a custom `s_home.html` to replace the simple app selector with full enterprise navigation dropdowns:
+In complex enterprise applications, you can replace or augment the default model search with full custom navigation dropdowns:
 
 ```html
-<!-- jinja2/s_home.html -->
+<!-- jinja2/custom_nav.html -->
 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
   {% include "s_HomeLink.html" %}
 
@@ -282,27 +312,21 @@ In your custom ERP application, you can create a custom `s_home.html` to replace
     <div class="dropdown-menu">
       <a class="dropdown-item" href="/inventory/index/">Items</a>
       <a class="dropdown-item" href="/inventory/stock/">Stock Report</a>
-      <a class="dropdown-item" href="/inventory/bom/">BOM Management</a>
-    </div>
-  </li>
-
-  <!-- Sales Module -->
-  <li class="nav-item dropdown">
-    <a class="nav-link dropdown-toggle{% if '/sales/' in request.path %} active{% endif %}"
-       data-bs-toggle="dropdown" href="#" role="button">Sales</a>
-    <div class="dropdown-menu">
-      <a class="dropdown-item" href="/sales/order/">New Order</a>
-      <a class="dropdown-item" href="/sales/pos/">POS Billing</a>
     </div>
   </li>
 </ul>
 ```
 
-To activate this across your admin views, configure `madmin = "s_home.html"` in your base template:
+`saz3Nav.html` supports three flexible navigation modes via the `madmin` context variable:
+1. **Model Introspection Mode (`madmin` is dict)**: Automatically generates the dynamic App and Model dropdown selector.
+2. **Custom Template Mode (`madmin` is string, e.g. `"custom_nav.html"`)**: Dynamically includes your custom enterprise navigation menu.
+3. **Default Standalone Mode (`madmin` is None)**: Displays minimal Sastry **Data Grid** and **ER Diagram** toggle buttons.
+
+To activate custom navigation across your admin views, configure `madmin = "custom_nav.html"` in your view template:
 
 ```html
 <!-- jinja2/admin.html -->
-{% set madmin = "s_home.html" %}
+{% set madmin = "custom_nav.html" %}
 {% set tbl_cls = 'tableContainer' %}
 {% extends "saz3Nav.html" %}
 ```
@@ -453,6 +477,15 @@ document.addEventListener('DOMContentLoaded', () => {
     window.customerController = new CustomerListController();
 });
 ```
+
+> [!TIP]
+> **Maintaining Legacy Script Paths via Re-Export**:
+> If your project already imports CRUD helpers from a custom workspace path (e.g. `static/js/core/utils/s_crud.js`), you do not need to update import paths across all your modules. Simply turn your existing file into an ES6 module proxy:
+> ```javascript
+> // static/js/core/utils/s_crud.js
+> export * from '/static/sastry/js/s_crud.js';
+> ```
+> This immediately routes all your existing application code to the library's compiled bundle without modifying import statements across your project.
 
 ---
 

@@ -81,7 +81,41 @@ INSTALLED_APPS = [
 ]
 ```
 
-### 2. Include URLs
+### 2. Configure Jinja2 Templates
+
+In your Django `settings.py`:
+
+```python
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.jinja2.Jinja2",
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "environment": "config.jinja2.environment",
+        },
+    },
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "APP_DIRS": True,
+        # ...
+    },
+]
+```
+
+Define the standard environment helper in `config/jinja2.py`:
+
+```python
+from jinja2 import Environment
+from django.templatetags.static import static
+from django.urls import reverse
+
+def environment(**options):
+    env = Environment(**options)
+    env.globals.update({"static": static, "url": reverse})
+    return env
+```
+
+### 3. Include URLs
 
 In your project's root `urls.py`:
 
@@ -94,7 +128,13 @@ urlpatterns = [
 ]
 ```
 
-### 3. Access the Interfaces
+### 4. Collect Static Assets
+
+```bash
+python manage.py collectstatic --noinput
+```
+
+### 5. Access the Interfaces
 
 Start your development server:
 

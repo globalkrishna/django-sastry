@@ -54,9 +54,19 @@
 
   <!-- Center: Interactive Diagram Viewport -->
   <main class="er-viewport" id="erViewport">
-    <canvas class="er-canvas-layer" id="erCanvas"></canvas>
-    <div class="er-nodes-layer" id="erNodesLayer">
-      <!-- Table cards and relational connectors injected dynamically by er_diagram.js -->
+    <div class="er-stage" id="erStage">
+      <canvas class="er-canvas-layer" id="erCanvas"></canvas>
+      <div class="er-nodes-layer" id="erNodesLayer">
+        <!-- Table cards and relational connectors injected dynamically by er_diagram.js -->
+      </div>
+    </div>
+
+    <!-- Floating Canvas Zoom & Pan Controls -->
+    <div class="er-zoom-controls">
+      <button type="button" class="er-zoom-btn" id="erZoomIn" title="Zoom In (Wheel Up)"><i class="bi bi-zoom-in"></i></button>
+      <button type="button" class="er-zoom-btn" id="erZoomOut" title="Zoom Out (Wheel Down)"><i class="bi bi-zoom-out"></i></button>
+      <button type="button" class="er-zoom-btn" id="erZoomReset" title="Reset Zoom (100%)"><span id="erZoomLevel">100%</span></button>
+      <button type="button" class="er-zoom-btn" id="erZoomFit" title="Fit All to View"><i class="bi bi-arrows-fullscreen"></i></button>
     </div>
   </main>
 

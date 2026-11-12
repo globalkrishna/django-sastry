@@ -6,7 +6,7 @@
  * @author Krishnamurthy (Global Multimedia)
  */
 
-export interface FieldMetadata {
+interface FieldMetadata {
   ColumnType: string;
   lbl?: string;
   null?: boolean;
@@ -18,9 +18,9 @@ export interface FieldMetadata {
   internal_type?: string;
 }
 
-export type RelatedFieldTuple = [columnType: string, kind: string | null];
+type RelatedFieldTuple = [columnType: string, kind: string | null];
 
-export interface ActiveTableModel {
+interface ActiveTableModel {
   FieldSeq: string[];
   has_many?: string[];
   app_label?: string;
@@ -30,12 +30,12 @@ export interface ActiveTableModel {
   [fieldName: string]: any;
 }
 
-export interface RelatedTableModel {
+interface RelatedTableModel {
   FieldSeq: string[];
   [fieldName: string]: any;
 }
 
-export interface ERDiagramPayload {
+interface ERDiagramPayload {
   main_table: string;
   app_label: string;
   model_name: string;
@@ -44,7 +44,7 @@ export interface ERDiagramPayload {
   has_many: Record<string, RelatedTableModel>;
 }
 
-export interface ERDiagramOptions {
+interface ERDiagramOptions {
   containerSelector?: string;
   viewportSelector?: string;
   canvasSelector?: string;
@@ -57,7 +57,7 @@ export interface ERDiagramOptions {
   defaultModel?: string;
 }
 
-export interface ElementRelativeRect {
+interface ElementRelativeRect {
   left: number;
   top: number;
   right: number;
@@ -66,15 +66,25 @@ export interface ElementRelativeRect {
   height: number;
 }
 
-export class SastryERDiagram {
+
+class SastryERDiagram {
   private container: HTMLElement | null;
   private viewport: HTMLElement | null;
+  private stage: HTMLElement | null;
   private canvas: HTMLCanvasElement | null;
   private nodesLayer: HTMLElement | null;
   private sidebarLeft: HTMLElement | null;
   private inspectorBody: HTMLElement | null;
   private currentModelTitle: HTMLElement | null;
   private searchInput: HTMLInputElement | null;
+  private zoomLevelEl: HTMLElement | null = null;
+
+  public zoom: number = 1;
+  public panX: number = 0;
+  public panY: number = 0;
+  private isPanning: boolean = false;
+  private startX: number = 0;
+  private startY: number = 0;
 
   public activeApp: string;
   public activeModel: string;
@@ -117,12 +127,14 @@ export class SastryERDiagram {
   constructor(options: ERDiagramOptions = {}) {
     this.container = document.querySelector(options.containerSelector || '#erDiagramContainer');
     this.viewport = document.querySelector(options.viewportSelector || '#erViewport');
+    this.stage = document.querySelector('#erStage');
     this.canvas = document.querySelector(options.canvasSelector || '#erCanvas');
     this.nodesLayer = document.querySelector(options.nodesSelector || '#erNodesLayer');
     this.sidebarLeft = document.querySelector(options.sidebarLeftSelector || '#erSidebarLeft');
     this.inspectorBody = document.querySelector(options.inspectorBodySelector || '#erInspectorBody');
     this.currentModelTitle = document.querySelector(options.currentModelTitleSelector || '#erCurrentModelTitle');
     this.searchInput = document.querySelector(options.searchInputSelector || '#erSearchInput');
+    this.zoomLevelEl = document.querySelector('#erZoomLevel');
 
     this.activeApp = options.defaultApp || ((document.querySelector('.er-app-group') as HTMLElement)?.dataset.app || '');
     this.activeModel = options.defaultModel || ((document.querySelector('.er-model-item') as HTMLElement)?.dataset.model || '');
@@ -210,7 +222,7 @@ export class SastryERDiagram {
               return;
             }
 
-            this.lastClickedFk = fieldName;
+            this.lastClickedFk = fieldName || null;
             if (fieldName) {
               this.selectField(fieldName);
             }
@@ -240,10 +252,144 @@ export class SastryERDiagram {
       });
     }
 
-    // Redraw connections on viewport scroll or window resize
+    // Redraw connections on window resize
     window.addEventListener('resize', () => this.redraw());
+
+    // Viewport Pan (drag background) and Zoom (mouse wheel)
     if (this.viewport) {
-      this.viewport.addEventListener('scroll', () => this.drawConnections());
+      this.viewport.addEventListener('wheel', (e: WheelEvent) => this.onWheel(e), { passive: false });
+      this.viewport.addEventListener('mousedown', (e: MouseEvent) => this.onMouseDown(e));
+      window.addEventListener('mousemove', (e: MouseEvent) => this.onMouseMove(e));
+      window.addEventListener('mouseup', () => this.onMouseUp());
+    }
+
+    // Floating Zoom Controls
+    const btnZoomIn = document.getElementById('erZoomIn');
+    if (btnZoomIn) btnZoomIn.addEventListener('click', () => this.zoomBy(1.2));
+
+    const btnZoomOut = document.getElementById('erZoomOut');
+    if (btnZoomOut) btnZoomOut.addEventListener('click', () => this.zoomBy(0.8));
+
+    const btnZoomReset = document.getElementById('erZoomReset');
+    if (btnZoomReset) btnZoomReset.addEventListener('click', () => this.zoomReset());
+
+    const btnZoomFit = document.getElementById('erZoomFit');
+    if (btnZoomFit) btnZoomFit.addEventListener('click', () => this.zoomFit());
+  }
+
+  public applyTransform(): void {
+    if (this.stage) {
+      this.stage.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.zoom})`;
+    }
+    if (this.zoomLevelEl) {
+      this.zoomLevelEl.textContent = `${Math.round(this.zoom * 100)}%`;
+    }
+    if (this.viewport) {
+      this.viewport.style.backgroundPosition = `${this.panX}px ${this.panY}px`;
+      this.viewport.style.backgroundSize = `${20 * this.zoom}px ${20 * this.zoom}px`;
+    }
+  }
+
+  public zoomBy(factor: number): void {
+    if (!this.viewport) return;
+    const rect = this.viewport.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    const newZoom = Math.min(2.5, Math.max(0.25, this.zoom * factor));
+    this.panX = centerX - ((centerX - this.panX) / this.zoom) * newZoom;
+    this.panY = centerY - ((centerY - this.panY) / this.zoom) * newZoom;
+    this.zoom = newZoom;
+    this.applyTransform();
+  }
+
+  public zoomReset(): void {
+    this.zoom = 1;
+    this.panX = 0;
+    this.panY = 0;
+    this.applyTransform();
+  }
+
+  public zoomFit(): void {
+    if (!this.viewport || !this.nodesLayer) return;
+    const allCards = Array.from(this.nodesLayer.querySelectorAll('.er-table-card')) as HTMLElement[];
+    if (allCards.length === 0) return;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    allCards.forEach(card => {
+      const x = parseFloat(card.style.left) || 0;
+      const y = parseFloat(card.style.top) || 0;
+      const w = card.offsetWidth || 280;
+      const h = card.offsetHeight || 260;
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x + w > maxX) maxX = x + w;
+      if (y + h > maxY) maxY = y + h;
+    });
+
+    const contentW = Math.max(100, maxX - minX);
+    const contentH = Math.max(100, maxY - minY);
+    const viewW = this.viewport.clientWidth;
+    const viewH = this.viewport.clientHeight;
+
+    const padding = 60;
+    const scaleX = (viewW - padding * 2) / contentW;
+    const scaleY = (viewH - padding * 2) / contentH;
+    this.zoom = Math.min(1.0, Math.max(0.25, Math.min(scaleX, scaleY)));
+
+    const scaledContentW = contentW * this.zoom;
+    const scaledContentH = contentH * this.zoom;
+    this.panX = (viewW - scaledContentW) / 2 - minX * this.zoom;
+    this.panY = (viewH - scaledContentH) / 2 - minY * this.zoom;
+
+    this.applyTransform();
+  }
+
+  private onWheel(e: WheelEvent): void {
+    if (!this.viewport) return;
+    e.preventDefault();
+    const rect = this.viewport.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    const newZoom = Math.min(2.5, Math.max(0.25, this.zoom * factor));
+
+    this.panX = mouseX - ((mouseX - this.panX) / this.zoom) * newZoom;
+    this.panY = mouseY - ((mouseY - this.panY) / this.zoom) * newZoom;
+    this.zoom = newZoom;
+
+    this.applyTransform();
+  }
+
+  private onMouseDown(e: MouseEvent): void {
+    const target = e.target as HTMLElement;
+    if (target.closest('.er-table-card') || target.closest('.er-zoom-controls')) {
+      return;
+    }
+    if (e.button === 0 || e.button === 1) {
+      this.isPanning = true;
+      this.startX = e.clientX - this.panX;
+      this.startY = e.clientY - this.panY;
+      if (this.viewport) {
+        this.viewport.classList.add('is-panning');
+      }
+    }
+  }
+
+  private onMouseMove(e: MouseEvent): void {
+    if (!this.isPanning) return;
+    this.panX = e.clientX - this.startX;
+    this.panY = e.clientY - this.startY;
+    this.applyTransform();
+  }
+
+  private onMouseUp(): void {
+    if (this.isPanning) {
+      this.isPanning = false;
+      if (this.viewport) {
+        this.viewport.classList.remove('is-panning');
+      }
     }
   }
 
@@ -331,24 +477,53 @@ export class SastryERDiagram {
     const activeCard = this.createTableCard(main_table, lvt, 'active-table', 'Selected Table');
     this.nodesLayer.appendChild(activeCard);
 
-    // Build reverse relation table cards (has_many / Child Tables)
+    // Identify all unique related tables (a table might be both foreign and has_many)
+    const foreignKeys = Object.keys(foreign || {});
     const hasManyKeys = Object.keys(has_many || {});
+
+    interface RelatedTableMeta {
+      key: string;
+      data: any;
+      cardType: 'has-many-table' | 'foreign-table' | 'mutual-table';
+      badge: string;
+    }
+
+    const relatedMap = new Map<string, RelatedTableMeta>();
+
+    // First collect child tables (has_many)
     hasManyKeys.forEach(relKey => {
-      const relData = has_many[relKey];
-      const card = this.createTableCard(relKey, relData, 'has-many-table', 'Child Table');
-      this.nodesLayer!.appendChild(card);
+      relatedMap.set(relKey, {
+        key: relKey,
+        data: has_many[relKey],
+        cardType: 'has-many-table',
+        badge: 'Child Table'
+      });
     });
 
-    // Build outgoing foreign key table cards (foreign / Referenced Tables)
-    const foreignKeys = Object.keys(foreign || {});
+    // Then process foreign key targets
     foreignKeys.forEach(fkKey => {
-      const fkData = foreign[fkKey];
-      const card = this.createTableCard(fkKey, fkData, 'foreign-table', 'Referenced Table');
+      if (relatedMap.has(fkKey)) {
+        const existing = relatedMap.get(fkKey)!;
+        existing.cardType = 'mutual-table';
+        existing.badge = 'Ref & Child';
+      } else {
+        relatedMap.set(fkKey, {
+          key: fkKey,
+          data: foreign[fkKey],
+          cardType: 'foreign-table',
+          badge: 'Referenced Table'
+        });
+      }
+    });
+
+    // Create cards for each UNIQUE related table
+    relatedMap.forEach(meta => {
+      const card = this.createTableCard(meta.key, meta.data, meta.cardType, meta.badge);
       this.nodesLayer!.appendChild(card);
     });
 
     // Layout cards: Selected Table on the RIGHT, related tables distributed in columns on the LEFT
-    this.layoutNodes(hasManyKeys, main_table, foreignKeys);
+    this.layoutNodes(Array.from(relatedMap.keys()), main_table);
 
     // Select primary key field or first field
     const pkField = lvt.FieldSeq.find(f => {
@@ -359,6 +534,9 @@ export class SastryERDiagram {
     if (pkField) {
       this.selectField(pkField);
     }
+
+    // Auto-fit cards comfortably into view
+    this.zoomFit();
 
     // Draw canvas connector lines
     requestAnimationFrame(() => this.drawConnections());
@@ -372,7 +550,17 @@ export class SastryERDiagram {
 
     const shortName = tableKey.includes('.') ? tableKey.split('.')[1] : tableKey;
     const appName = tableKey.includes('.') ? tableKey.split('.')[0] : '';
-    const iconClass = cardTypeClass === 'active-table' ? 'bi-star-fill text-dark' : (cardTypeClass === 'has-many-table' ? 'bi-arrow-return-right' : 'bi-link-45deg');
+    const iconClass = cardTypeClass === 'active-table' 
+      ? 'bi-star-fill text-dark' 
+      : (cardTypeClass === 'mutual-table'
+        ? 'bi-arrow-left-right'
+        : (cardTypeClass === 'has-many-table' ? 'bi-arrow-return-right' : 'bi-link-45deg'));
+
+    const badgeLabel = cardTypeClass === 'active-table' 
+      ? 'Selected' 
+      : (cardTypeClass === 'mutual-table'
+        ? 'Ref & Child ⇄'
+        : (cardTypeClass === 'has-many-table' ? 'Child ↗' : 'Ref ↗'));
 
     let headerHtml = `
       <div class="er-table-header" title="${badgeText}: ${tableKey}">
@@ -381,7 +569,7 @@ export class SastryERDiagram {
           <span class="text-truncate">${shortName}</span>
           ${appName ? `<span class="opacity-75 ms-1 small" style="font-size:0.7rem">(${appName})</span>` : ''}
         </div>
-        <span class="er-table-badge">${cardTypeClass === 'active-table' ? 'Selected' : (cardTypeClass === 'has-many-table' ? 'Child ↗' : 'Ref ↗')}</span>
+        <span class="er-table-badge">${badgeLabel}</span>
       </div>
       <div class="er-table-body">
     `;
@@ -403,8 +591,8 @@ export class SastryERDiagram {
       }
 
       const icon = this.icons[colType] || this.icons['Text'];
-      const isFk = colType === 'ForeignKey' && kind;
-      const shortKind = isFk ? (kind.includes('.') ? kind.split('.')[1] : kind) : '';
+      const isFk = colType === 'ForeignKey' && !!kind;
+      const shortKind = (isFk && kind) ? (kind.includes('.') ? kind.split('.')[1] : kind) : '';
       headerHtml += `
         <div class="er-field-row ${isFk ? 'is-foreign-key' : ''}" 
              data-field="${fieldName}" 
@@ -430,39 +618,38 @@ export class SastryERDiagram {
     return card;
   }
 
-  private layoutNodes(hasManyKeys: string[], mainTableKey: string, foreignKeys: string[]): void {
+  private layoutNodes(relatedKeys: string[], mainTableKey: string): void {
     if (!this.viewport || !this.nodesLayer) return;
 
-    const cardSpacingX = 60;
-    const cardSpacingY = 16;
-    const colWidth = 260;
+    const cardSpacingX = 90;
+    const cardSpacingY = 24;
+    const colWidth = 280;
+    const activeColWidth = 320;
 
     const activeCard = document.getElementById(`er-card-${mainTableKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
     if (!activeCard) return;
 
-    const totalRelated = hasManyKeys.length + foreignKeys.length;
+    const totalRelated = relatedKeys.length;
 
-    // How many columns of related tables do we need to the left?
-    // Distribute ~3 tables per column, up to 4 columns
-    const numCols = totalRelated > 0 ? Math.min(4, Math.max(1, Math.ceil(totalRelated / 3))) : 0;
+    // Distribute across columns (~4 to 5 tables per column, dynamically scaling to as many columns as needed)
+    const numCols = totalRelated > 0 ? Math.max(1, Math.ceil(totalRelated / 5)) : 0;
 
-    // Total width needed to fit numCols columns plus the Selected Table
+    // Total width needed to fit all columns plus the Selected Table with generous margins
     const neededWidth = numCols > 0 
-      ? (40 + numCols * (colWidth + cardSpacingX) + colWidth + 40)
-      : (colWidth + 80);
+      ? (140 + numCols * (colWidth + cardSpacingX) + activeColWidth + 140)
+      : (activeColWidth + 300);
 
-    // Canvas width is at least the viewport's client width
     const canvasWidth = Math.max(this.viewport.clientWidth, neededWidth);
 
-    // Position Selected Active Table at the EXTREME RIGHT of the canvas (adjacent to inspector on right)
-    const selectedTableX = canvasWidth - colWidth - 40;
-    const selectedTableY = 40;
+    // Position Selected Active Table at the RIGHT of the canvas
+    const selectedTableX = canvasWidth - activeColWidth - 100;
+    const selectedTableY = 60;
     activeCard.style.left = `${selectedTableX}px`;
     activeCard.style.top = `${selectedTableY}px`;
 
     if (numCols === 0) {
       const maxX = canvasWidth;
-      const maxY = selectedTableY + activeCard.offsetHeight + 80;
+      const maxY = selectedTableY + (activeCard.offsetHeight || 300) + 100;
       this.nodesLayer.style.width = `${maxX}px`;
       this.nodesLayer.style.height = `${Math.max(maxY, this.viewport.clientHeight)}px`;
       this.resizeCanvas(maxX, Math.max(maxY, this.viewport.clientHeight));
@@ -473,55 +660,47 @@ export class SastryERDiagram {
     // Column 0 is closest to Selected Table, Column 1 to the left of that, etc.
     const colXCoordinates: number[] = [];
     for (let c = 0; c < numCols; c++) {
-      colXCoordinates.push(selectedTableX - (c + 1) * (colWidth + cardSpacingX));
+      colXCoordinates.push(selectedTableX - cardSpacingX - colWidth - c * (colWidth + cardSpacingX));
     }
 
-    // Initialize column Y heights (starting at 40px)
-    const colHeights = new Array(numCols).fill(40);
+    // Initialize column Y heights (starting at 60px)
+    const colHeights = new Array(numCols).fill(60);
 
-    // Place related table cards: filling Column 0 first (closest to Selected Table), then Column 1, Column 2, etc.
-    const placeTables = (keys: string[]) => {
-      keys.forEach(key => {
-        const card = document.getElementById(`er-card-${key.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
-        if (!card) return;
+    const placeTable = (key: string) => {
+      const card = document.getElementById(`er-card-${key.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
+      if (!card) return;
 
-        // Find column with minimum height (tie-break: choose lowest column index, i.e. closest to Selected Table)
-        let bestCol = 0;
+      let bestCol = 0;
+      if (numCols > 1) {
         let minH = colHeights[0];
-        for (let c = 0; c < numCols; c++) {
+        for (let c = 1; c < numCols; c++) {
           if (colHeights[c] < minH) {
             minH = colHeights[c];
             bestCol = c;
           }
         }
+      }
 
-        const cardX = colXCoordinates[bestCol];
-        const cardY = colHeights[bestCol];
-        card.style.left = `${cardX}px`;
-        card.style.top = `${cardY}px`;
-        colHeights[bestCol] += card.offsetHeight + cardSpacingY;
-      });
+      const cardX = colXCoordinates[bestCol];
+      const cardY = colHeights[bestCol];
+      card.style.left = `${cardX}px`;
+      card.style.top = `${cardY}px`;
+      const cardH = card.offsetHeight || (card.getBoundingClientRect().height / (this.zoom || 1)) || 260;
+      colHeights[bestCol] += cardH + cardSpacingY;
     };
 
-    // Place Child Tables (has_many) first, then Foreign Tables
-    placeTables(hasManyKeys);
-    placeTables(foreignKeys);
+    // Place all unique related tables
+    relatedKeys.forEach(placeTable);
 
     // Compute total canvas dimensions
-    const maxColHeight = Math.max(...colHeights, selectedTableY + activeCard.offsetHeight);
-    const maxY = maxColHeight + 80;
+    const maxColHeight = Math.max(...colHeights, selectedTableY + (activeCard.offsetHeight || 300));
+    const maxY = maxColHeight + 120;
+    const canvasHeight = Math.max(maxY, this.viewport.clientHeight);
 
     this.nodesLayer.style.width = `${canvasWidth}px`;
-    this.nodesLayer.style.height = `${Math.max(maxY, this.viewport.clientHeight)}px`;
+    this.nodesLayer.style.height = `${canvasHeight}px`;
 
-    this.resizeCanvas(canvasWidth, Math.max(maxY, this.viewport.clientHeight));
-
-    // When content overflows, scroll viewport so the selected table on the extreme right is initially in view
-    if (canvasWidth > this.viewport.clientWidth) {
-      this.viewport.scrollLeft = canvasWidth - this.viewport.clientWidth;
-    } else {
-      this.viewport.scrollLeft = 0;
-    }
+    this.resizeCanvas(canvasWidth, canvasHeight);
   }
 
   private resizeCanvas(width: number, height: number): void {
@@ -561,9 +740,9 @@ export class SastryERDiagram {
 
     // 1. Draw Incoming Reverse Relations (has_many) -> Pointing to Active Table PK
     if (activePkRow) {
-      const activePkRect = this.getRelativeRect(activePkRow);
-      const targetAnchorX = activePkRect.left;
-      const targetAnchorY = activePkRect.top + activePkRect.height / 2;
+      const activePkAnchor = this.getRowAnchor(activePkRow, false);
+      const targetAnchorX = activePkAnchor.x;
+      const targetAnchorY = activePkAnchor.y;
 
       ctx.lineWidth = 1.5;
       ctx.strokeStyle = '#0891b2'; // Cyan/Teal
@@ -582,26 +761,24 @@ export class SastryERDiagram {
           if (Array.isArray(fTuple) && fTuple[1] === main_table) {
             const relRow = document.getElementById(`er-row-${relKey.replace(/[^a-zA-Z0-9_-]/g, '_')}-${f}`);
             if (relRow) {
-              const relRect = this.getRelativeRect(relRow);
-              const startX = relRect.right;
-              const startY = relRect.top + relRect.height / 2;
+              const relAnchor = this.getRowAnchor(relRow, true);
+              const startX = relAnchor.x;
+              const startY = relAnchor.y;
 
-              // Draw smooth cubic curve
-              ctx.beginPath();
-              ctx.moveTo(startX, startY);
-              const cp1X = startX + (targetAnchorX - startX) * 0.5;
-              const cp1Y = startY;
-              const cp2X = startX + (targetAnchorX - startX) * 0.5;
-              const cp2Y = targetAnchorY;
-              ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, targetAnchorX, targetAnchorY);
-              ctx.stroke();
+              this.drawSpline(ctx, startX, startY, targetAnchorX, targetAnchorY, '#0891b2');
 
               // Draw Arrowhead at active PK left
+              ctx.fillStyle = '#0891b2';
               ctx.beginPath();
               ctx.moveTo(targetAnchorX, targetAnchorY);
               ctx.lineTo(targetAnchorX - 7, targetAnchorY - 4);
               ctx.lineTo(targetAnchorX - 7, targetAnchorY + 4);
               ctx.closePath();
+              ctx.fill();
+
+              // Draw anchor dot at source row
+              ctx.beginPath();
+              ctx.arc(startX, startY, 3, 0, 2 * Math.PI);
               ctx.fill();
             }
           }
@@ -632,36 +809,21 @@ export class SastryERDiagram {
 
           const targetPkRow = document.getElementById(`er-row-${targetKey.replace(/[^a-zA-Z0-9_-]/g, '_')}-${targetPkField}`);
           if (targetPkRow) {
-            const fkRect = this.getRelativeRect(fkRow);
-            const targetPkRect = this.getRelativeRect(targetPkRow);
+            const fkAnchor = this.getRowAnchor(fkRow, false);
+            const targetPkAnchor = this.getRowAnchor(targetPkRow, true);
 
-            // Active table FK is on the right -> anchor at left edge of fkRow
-            const startX = fkRect.left;
-            const startY = fkRect.top + fkRect.height / 2;
-
-            // Target table PK is on the left -> anchor at right edge of targetPkRow
-            const endX = targetPkRect.right;
-            const endY = targetPkRect.top + targetPkRect.height / 2;
+            const startX = fkAnchor.x;
+            const startY = fkAnchor.y;
+            const endX = targetPkAnchor.x;
+            const endY = targetPkAnchor.y;
 
             const strokeColor = this.fkColors[colorIdx % this.fkColors.length];
             colorIdx++;
 
-            ctx.lineWidth = 1.8;
-            ctx.strokeStyle = strokeColor;
-            ctx.fillStyle = strokeColor;
-
-            // Draw connecting bezier curve going leftwards from startX to endX
-            const dist = Math.abs(startX - endX);
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            const cp1X = startX - dist * 0.45;
-            const cp1Y = startY;
-            const cp2X = endX + dist * 0.45;
-            const cp2Y = endY;
-            ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
-            ctx.stroke();
+            this.drawSpline(ctx, startX, startY, endX, endY, strokeColor);
 
             // Draw small circle anchor at target PK (right edge)
+            ctx.fillStyle = strokeColor;
             ctx.beginPath();
             ctx.arc(endX, endY, 4, 0, 2 * Math.PI);
             ctx.fill();
@@ -676,16 +838,56 @@ export class SastryERDiagram {
     });
   }
 
+  private drawSpline(
+    ctx: CanvasRenderingContext2D,
+    startX: number,
+    startY: number,
+    endX: number,
+    endY: number,
+    color: string
+  ): void {
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = color;
+
+    const dx = endX - startX;
+    const curvature = Math.min(180, Math.max(40, Math.abs(dx) * 0.45));
+    const cp1X = dx >= 0 ? startX + curvature : startX - curvature;
+    const cp1Y = startY;
+    const cp2X = dx >= 0 ? endX - curvature : endX + curvature;
+    const cp2Y = endY;
+
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
+    ctx.stroke();
+  }
+
+  private getRowAnchor(rowEl: HTMLElement, isRightSide: boolean): { x: number; y: number } {
+    const parentRect = this.nodesLayer!.getBoundingClientRect();
+    const rowRect = rowEl.getBoundingClientRect();
+    const cardEl = rowEl.closest('.er-table-card') as HTMLElement | null;
+
+    const z = this.zoom || 1;
+    const y = (rowRect.top - parentRect.top) / z + (rowRect.height / 2) / z;
+    const cardRect = cardEl ? cardEl.getBoundingClientRect() : rowRect;
+    const x = isRightSide
+      ? (cardRect.right - parentRect.left) / z
+      : (cardRect.left - parentRect.left) / z;
+
+    return { x, y };
+  }
+
   private getRelativeRect(element: HTMLElement): ElementRelativeRect {
     const elRect = element.getBoundingClientRect();
     const parentRect = this.nodesLayer!.getBoundingClientRect();
+    const z = this.zoom || 1;
     return {
-      left: elRect.left - parentRect.left,
-      top: elRect.top - parentRect.top,
-      right: elRect.right - parentRect.left,
-      bottom: elRect.bottom - parentRect.top,
-      width: elRect.width,
-      height: elRect.height
+      left: (elRect.left - parentRect.left) / z,
+      top: (elRect.top - parentRect.top) / z,
+      right: (elRect.right - parentRect.left) / z,
+      bottom: (elRect.bottom - parentRect.top) / z,
+      width: elRect.width / z,
+      height: elRect.height / z
     };
   }
 
@@ -793,8 +995,20 @@ export class SastryERDiagram {
   public highlightAndScrollToNode(tableKey: string): void {
     const cardId = `er-card-${tableKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
     const card = document.getElementById(cardId);
-    if (!card) return;
-    card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    if (!card || !this.viewport) return;
+
+    const cardLeft = parseFloat(card.style.left) || 0;
+    const cardTop = parseFloat(card.style.top) || 0;
+    const cardW = card.offsetWidth || 280;
+    const cardH = card.offsetHeight || 260;
+
+    const viewW = this.viewport.clientWidth;
+    const viewH = this.viewport.clientHeight;
+
+    this.panX = (viewW / 2) - (cardLeft + cardW / 2) * this.zoom;
+    this.panY = (viewH / 2) - (cardTop + cardH / 2) * this.zoom;
+    this.applyTransform();
+
     card.classList.remove('er-card-pulse');
     void card.offsetWidth; // Force DOM reflow
     card.classList.add('er-card-pulse');
@@ -806,6 +1020,9 @@ export class SastryERDiagram {
     }
   }
 }
+
+// Export globally for browser script tag usage
+(window as any).SastryERDiagram = SastryERDiagram;
 
 // Global initialization helper
 document.addEventListener('DOMContentLoaded', () => {

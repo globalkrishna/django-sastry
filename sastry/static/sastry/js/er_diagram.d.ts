@@ -5,7 +5,7 @@
  * @license MIT
  * @author Krishnamurthy (Global Multimedia)
  */
-export interface FieldMetadata {
+interface FieldMetadata {
     ColumnType: string;
     lbl?: string;
     null?: boolean;
@@ -16,8 +16,8 @@ export interface FieldMetadata {
     kind?: string | null;
     internal_type?: string;
 }
-export type RelatedFieldTuple = [columnType: string, kind: string | null];
-export interface ActiveTableModel {
+type RelatedFieldTuple = [columnType: string, kind: string | null];
+interface ActiveTableModel {
     FieldSeq: string[];
     has_many?: string[];
     app_label?: string;
@@ -26,11 +26,11 @@ export interface ActiveTableModel {
     sel_many?: Record<string, boolean>;
     [fieldName: string]: any;
 }
-export interface RelatedTableModel {
+interface RelatedTableModel {
     FieldSeq: string[];
     [fieldName: string]: any;
 }
-export interface ERDiagramPayload {
+interface ERDiagramPayload {
     main_table: string;
     app_label: string;
     model_name: string;
@@ -38,7 +38,7 @@ export interface ERDiagramPayload {
     foreign: Record<string, RelatedTableModel>;
     has_many: Record<string, RelatedTableModel>;
 }
-export interface ERDiagramOptions {
+interface ERDiagramOptions {
     containerSelector?: string;
     viewportSelector?: string;
     canvasSelector?: string;
@@ -50,7 +50,7 @@ export interface ERDiagramOptions {
     defaultApp?: string;
     defaultModel?: string;
 }
-export interface ElementRelativeRect {
+interface ElementRelativeRect {
     left: number;
     top: number;
     right: number;
@@ -58,25 +58,42 @@ export interface ElementRelativeRect {
     width: number;
     height: number;
 }
-export declare class SastryERDiagram {
+declare class SastryERDiagram {
     private container;
     private viewport;
+    private stage;
     private canvas;
     private nodesLayer;
     private sidebarLeft;
     private inspectorBody;
     private currentModelTitle;
     private searchInput;
+    private zoomLevelEl;
+    zoom: number;
+    panX: number;
+    panY: number;
+    private isPanning;
+    private startX;
+    private startY;
     activeApp: string;
     activeModel: string;
     currentData: ERDiagramPayload | null;
     selectedField: string | null;
+    private lastClickedFk;
     private cache;
     private readonly fkColors;
     private readonly icons;
     constructor(options?: ERDiagramOptions);
     private init;
     private bindEvents;
+    applyTransform(): void;
+    zoomBy(factor: number): void;
+    zoomReset(): void;
+    zoomFit(): void;
+    private onWheel;
+    private onMouseDown;
+    private onMouseMove;
+    private onMouseUp;
     filterModelList(query: string): void;
     loadModel(appLabel: string, modelName: string): Promise<void>;
     render(): void;
@@ -84,9 +101,12 @@ export declare class SastryERDiagram {
     private layoutNodes;
     private resizeCanvas;
     drawConnections(): void;
+    private drawSpline;
+    private getRowAnchor;
     private getRelativeRect;
     selectField(fieldName: string): void;
     private renderInspector;
     jumpToModel(fullLabel: string): void;
+    highlightAndScrollToNode(tableKey: string): void;
     redraw(): void;
 }
