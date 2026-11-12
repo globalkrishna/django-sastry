@@ -1,23 +1,28 @@
 import { AdminerEdit } from './s_crud.js';
 
-var adminer_crud = null;
+declare const view: any;
+
+var adminer_crud: AdminerEdit | null = null;
 
 function resizeAdminer() {
     const m = document.querySelector('main');
-    // @ts-expect-error TS(2531): Object is possibly 'null'.
-    let ddh = window.innerHeight - m.offsetTop - document.querySelector('footer').offsetHeight;
-    // @ts-expect-error TS(2531): Object is possibly 'null'.
-    m.style.height = `${ddh}px`;
+    if (m) {
+        const footer = document.querySelector('footer');
+        const footerHeight = footer ? footer.offsetHeight : 0;
+        let ddh = window.innerHeight - m.offsetTop - footerHeight;
+        m.style.height = `${ddh}px`;
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function () {
     adminer_crud = new AdminerEdit();
     resizeAdminer();
     if (window.location.search.length) {
-        // @ts-expect-error TS(2345): Argument of type 'null' is not assignable to param... Remove this comment to see the full error message
-        history.replaceState({}, null, "/");
-
-        view.crud.setData();
+        history.replaceState({}, '', "/");
+        if (typeof view !== 'undefined' && view?.crud) {
+            view.crud.setData();
+        }
     }
 }, false);
+
 

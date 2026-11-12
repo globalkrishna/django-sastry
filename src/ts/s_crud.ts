@@ -1,7 +1,21 @@
 
 
 
-import { postWithCsrf } from '../modules/dom-utils.js';
+declare const bootstrap: any;
+
+/**
+ * Make a POST request with CSRF token (Standalone helper)
+ */
+export async function postWithCsrf(url: string, formData: FormData): Promise<Response> {
+    const csrfToken = (document.querySelector('[name=csrfmiddlewaretoken]') as HTMLInputElement)?.value || 
+                      (document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '');
+    formData.append('csrfmiddlewaretoken', csrfToken);
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken },
+        body: formData
+    });
+}
 
 export class db_crud<T extends { id?: string | number, [key: string]: any } = any> {
     collection: T[] = [];
@@ -367,14 +381,14 @@ export class db_crud<T extends { id?: string | number, [key: string]: any } = an
             formData.append('record_list', JSON.stringify(cud));
 
             postWithCsrf(`${this.href}''/`, formData)
-                .then(response => response.text())
-                .then(data => {
+                .then((response: Response) => response.text())
+                .then((data: string) => {
                     alert(data);
                     if (data === 'Cleared') {
                         document.querySelector('#SaveAll')!.classList.add('d-none');
                     }
                 })
-                .catch(error => console.error('Error:', error));
+                .catch((error: any) => console.error('Error:', error));
         }
         (document.getElementById('SaveAll') as HTMLButtonElement).disabled = true;
     }

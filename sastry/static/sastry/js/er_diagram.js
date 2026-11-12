@@ -1,235 +1,236 @@
 /**
  * Sastry Entity Relations (ER) Diagram Engine
  * Interactive, high-performance visual ER diagram and schema inspector for Django.
+ *
+ * @license MIT
+ * @author Krishnamurthy (Global Multimedia)
  */
-
-class SastryERDiagram {
-  constructor(options = {}) {
-    this.container = document.querySelector(options.containerSelector || '#erDiagramContainer');
-    this.viewport = document.querySelector(options.viewportSelector || '#erViewport');
-    this.canvas = document.querySelector(options.canvasSelector || '#erCanvas');
-    this.nodesLayer = document.querySelector(options.nodesSelector || '#erNodesLayer');
-    this.sidebarLeft = document.querySelector(options.sidebarLeftSelector || '#erSidebarLeft');
-    this.inspectorBody = document.querySelector(options.inspectorBodySelector || '#erInspectorBody');
-    this.currentModelTitle = document.querySelector(options.currentModelTitleSelector || '#erCurrentModelTitle');
-    this.searchInput = document.querySelector(options.searchInputSelector || '#erSearchInput');
-
-    this.activeApp = options.defaultApp || 'customer';
-    this.activeModel = options.defaultModel || 'Customer';
-    this.currentData = null;
-    this.selectedField = null;
-    this.cache = new Map();
-
+export class SastryERDiagram {
+    container;
+    viewport;
+    canvas;
+    nodesLayer;
+    sidebarLeft;
+    inspectorBody;
+    currentModelTitle;
+    searchInput;
+    activeApp;
+    activeModel;
+    currentData = null;
+    selectedField = null;
+    cache = new Map();
     // Color palette for foreign key connection lines
-    this.fkColors = [
-      '#0284c7', // Sky blue
-      '#8b5cf6', // Violet
-      '#ec4899', // Pink
-      '#f97316', // Orange
-      '#10b981', // Emerald
-      '#6366f1', // Indigo
-      '#14b8a6', // Teal
-      '#d946ef', // Fuchsia
-      '#eab308', // Amber
-      '#ef4444', // Red
-      '#06b6d4', // Cyan
-      '#84cc16'  // Lime
+    fkColors = [
+        '#0284c7', // Sky blue
+        '#8b5cf6', // Violet
+        '#ec4899', // Pink
+        '#f97316', // Orange
+        '#10b981', // Emerald
+        '#6366f1', // Indigo
+        '#14b8a6', // Teal
+        '#d946ef', // Fuchsia
+        '#eab308', // Amber
+        '#ef4444', // Red
+        '#06b6d4', // Cyan
+        '#84cc16' // Lime
     ];
-
-    this.icons = {
-      'PrimaryKey': '<i class="bi bi-key-fill text-warning"></i>',
-      'ForeignKey': '<i class="bi bi-arrow-left-circle-fill text-primary"></i>',
-      'ManyToManyField': '<i class="bi bi-arrows-angle-expand text-info"></i>',
-      'CheckBox': '<i class="bi bi-check-square-fill text-success"></i>',
-      'Date': '<i class="bi bi-calendar-event text-danger"></i>',
-      'Time': '<i class="bi bi-clock text-secondary"></i>',
-      'Email': '<i class="bi bi-envelope text-primary"></i>',
-      'File': '<i class="bi bi-file-earmark-text text-info"></i>',
-      'Image': '<i class="bi bi-image text-success"></i>',
-      'Number': '<i class="bi bi-hash text-warning"></i>',
-      'TextArea': '<i class="bi bi-textarea-resize text-secondary"></i>',
-      'Text': '<i class="bi bi-fonts text-body-secondary"></i>'
+    icons = {
+        'PrimaryKey': '<i class="bi bi-key-fill text-warning"></i>',
+        'ForeignKey': '<i class="bi bi-arrow-left-circle-fill text-primary"></i>',
+        'ManyToManyField': '<i class="bi bi-arrows-angle-expand text-info"></i>',
+        'CheckBox': '<i class="bi bi-check-square-fill text-success"></i>',
+        'Date': '<i class="bi bi-calendar-event text-danger"></i>',
+        'Time': '<i class="bi bi-clock text-secondary"></i>',
+        'Email': '<i class="bi bi-envelope text-primary"></i>',
+        'File': '<i class="bi bi-file-earmark-text text-info"></i>',
+        'Image': '<i class="bi bi-image text-success"></i>',
+        'Number': '<i class="bi bi-hash text-warning"></i>',
+        'TextArea': '<i class="bi bi-textarea-resize text-secondary"></i>',
+        'Text': '<i class="bi bi-fonts text-body-secondary"></i>'
     };
-
-    this.init();
-  }
-
-  init() {
-    this.bindEvents();
-    if (this.activeApp && this.activeModel) {
-      this.loadModel(this.activeApp, this.activeModel);
+    constructor(options = {}) {
+        this.container = document.querySelector(options.containerSelector || '#erDiagramContainer');
+        this.viewport = document.querySelector(options.viewportSelector || '#erViewport');
+        this.canvas = document.querySelector(options.canvasSelector || '#erCanvas');
+        this.nodesLayer = document.querySelector(options.nodesSelector || '#erNodesLayer');
+        this.sidebarLeft = document.querySelector(options.sidebarLeftSelector || '#erSidebarLeft');
+        this.inspectorBody = document.querySelector(options.inspectorBodySelector || '#erInspectorBody');
+        this.currentModelTitle = document.querySelector(options.currentModelTitleSelector || '#erCurrentModelTitle');
+        this.searchInput = document.querySelector(options.searchInputSelector || '#erSearchInput');
+        this.activeApp = options.defaultApp || 'customer';
+        this.activeModel = options.defaultModel || 'Customer';
+        this.init();
     }
-  }
-
-  bindEvents() {
-    // Model search filtering
-    if (this.searchInput) {
-      this.searchInput.addEventListener('input', (e) => this.filterModelList(e.target.value));
-    }
-
-    // Left sidebar model selection
-    if (this.sidebarLeft) {
-      this.sidebarLeft.addEventListener('click', (e) => {
-        const item = e.target.closest('.er-model-item');
-        if (item) {
-          const app = item.dataset.app;
-          const model = item.dataset.model;
-          if (app && model) {
-            this.loadModel(app, model);
-          }
+    init() {
+        this.bindEvents();
+        if (this.activeApp && this.activeModel) {
+            this.loadModel(this.activeApp, this.activeModel);
         }
-      });
     }
-
-    // Table clicks inside viewport (card header clicks to center on related table)
-    if (this.nodesLayer) {
-      this.nodesLayer.addEventListener('click', (e) => {
-        // Check if header of a related table was clicked
-        const relatedHeader = e.target.closest('.er-table-card.has-many-table .er-table-header, .er-table-card.foreign-table .er-table-header');
-        if (relatedHeader) {
-          const card = relatedHeader.closest('.er-table-card');
-          const fullLabel = card.dataset.label; // e.g. "customer.Customer"
-          if (fullLabel && fullLabel.includes('.')) {
-            const [app, mdl] = fullLabel.split('.');
-            this.loadModel(app, mdl);
+    bindEvents() {
+        // Model search filtering
+        if (this.searchInput) {
+            this.searchInput.addEventListener('input', (e) => {
+                const target = e.target;
+                this.filterModelList(target.value);
+            });
+        }
+        // Left sidebar model selection
+        if (this.sidebarLeft) {
+            this.sidebarLeft.addEventListener('click', (e) => {
+                const target = e.target;
+                const item = target.closest('.er-model-item');
+                if (item) {
+                    const app = item.dataset.app;
+                    const model = item.dataset.model;
+                    if (app && model) {
+                        this.loadModel(app, model);
+                    }
+                }
+            });
+        }
+        // Table clicks inside viewport (card header clicks to center on related table)
+        if (this.nodesLayer) {
+            this.nodesLayer.addEventListener('click', (e) => {
+                const target = e.target;
+                // Check if header of a related table was clicked
+                const relatedHeader = target.closest('.er-table-card.has-many-table .er-table-header, .er-table-card.foreign-table .er-table-header');
+                if (relatedHeader) {
+                    const card = relatedHeader.closest('.er-table-card');
+                    const fullLabel = card?.dataset.label; // e.g. "customer.Customer"
+                    if (fullLabel && fullLabel.includes('.')) {
+                        const [app, mdl] = fullLabel.split('.');
+                        this.loadModel(app, mdl);
+                        return;
+                    }
+                }
+                // Check if field row inside active table was clicked
+                const fieldRow = target.closest('.er-table-card.active-table .er-field-row');
+                if (fieldRow) {
+                    const fieldName = fieldRow.dataset.field;
+                    if (fieldName) {
+                        this.selectField(fieldName);
+                    }
+                }
+            });
+        }
+        // Redraw connections on viewport scroll or window resize
+        window.addEventListener('resize', () => this.redraw());
+        if (this.viewport) {
+            this.viewport.addEventListener('scroll', () => this.drawConnections());
+        }
+    }
+    filterModelList(query) {
+        if (!this.sidebarLeft)
             return;
-          }
+        const q = query.toLowerCase().trim();
+        const items = this.sidebarLeft.querySelectorAll('.er-model-item');
+        const groups = this.sidebarLeft.querySelectorAll('.er-app-group');
+        items.forEach(item => {
+            const text = item.textContent?.toLowerCase() || '';
+            const match = text.includes(q);
+            item.style.display = match ? 'flex' : 'none';
+        });
+        groups.forEach(group => {
+            const visibleItems = group.querySelectorAll('.er-model-item:not([style*="display: none"])');
+            group.style.display = visibleItems.length > 0 ? 'block' : 'none';
+        });
+    }
+    async loadModel(appLabel, modelName) {
+        this.activeApp = appLabel;
+        this.activeModel = modelName;
+        // Highlight item in left sidebar
+        if (this.sidebarLeft) {
+            const allItems = this.sidebarLeft.querySelectorAll('.er-model-item');
+            allItems.forEach(el => el.classList.remove('active'));
+            const activeItem = this.sidebarLeft.querySelector(`.er-model-item[data-app="${appLabel}"][data-model="${modelName}"]`);
+            if (activeItem) {
+                activeItem.classList.add('active');
+                activeItem.scrollIntoView({ block: 'nearest' });
+            }
         }
-
-        // Check if field row inside active table was clicked
-        const fieldRow = e.target.closest('.er-table-card.active-table .er-field-row');
-        if (fieldRow) {
-          const fieldName = fieldRow.dataset.field;
-          this.selectField(fieldName);
+        if (this.currentModelTitle) {
+            this.currentModelTitle.textContent = `${appLabel}.${modelName}`;
         }
-      });
-    }
-
-    // Redraw connections on viewport scroll or window resize
-    window.addEventListener('resize', () => this.redraw());
-    if (this.viewport) {
-      this.viewport.addEventListener('scroll', () => this.drawConnections());
-    }
-  }
-
-  filterModelList(query) {
-    const q = query.toLowerCase().trim();
-    const items = this.sidebarLeft.querySelectorAll('.er-model-item');
-    const groups = this.sidebarLeft.querySelectorAll('.er-app-group');
-
-    items.forEach(item => {
-      const text = item.textContent.toLowerCase();
-      const match = text.includes(q);
-      item.style.display = match ? 'flex' : 'none';
-    });
-
-    groups.forEach(group => {
-      const visibleItems = group.querySelectorAll('.er-model-item:not([style*="display: none"])');
-      group.style.display = visibleItems.length > 0 ? 'block' : 'none';
-    });
-  }
-
-  async loadModel(appLabel, modelName) {
-    this.activeApp = appLabel;
-    this.activeModel = modelName;
-
-    // Highlight item in left sidebar
-    const allItems = this.sidebarLeft.querySelectorAll('.er-model-item');
-    allItems.forEach(el => el.classList.remove('active'));
-    const activeItem = this.sidebarLeft.querySelector(`.er-model-item[data-app="${appLabel}"][data-model="${modelName}"]`);
-    if (activeItem) {
-      activeItem.classList.add('active');
-      activeItem.scrollIntoView({ block: 'nearest' });
-    }
-
-    if (this.currentModelTitle) {
-      this.currentModelTitle.textContent = `${appLabel}.${modelName}`;
-    }
-
-    // Check cache
-    const cacheKey = `${appLabel}.${modelName}`;
-    if (this.cache.has(cacheKey)) {
-      this.currentData = this.cache.get(cacheKey);
-      this.render();
-      return;
-    }
-
-    // Fetch from API
-    try {
-      if (this.nodesLayer) {
-        this.nodesLayer.innerHTML = `
+        // Check cache
+        const cacheKey = `${appLabel}.${modelName}`;
+        if (this.cache.has(cacheKey)) {
+            this.currentData = this.cache.get(cacheKey);
+            this.render();
+            return;
+        }
+        // Fetch from API
+        try {
+            if (this.nodesLayer) {
+                this.nodesLayer.innerHTML = `
           <div class="d-flex align-items-center justify-content-center p-5 text-muted" style="min-height: 400px;">
             <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
             <span>Loading schema for <strong>${appLabel}.${modelName}</strong>...</span>
           </div>`;
-      }
-      const response = await fetch(`/sastry/er/api/${appLabel}/${modelName}/`);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      const data = await response.json();
-      this.cache.set(cacheKey, data);
-      this.currentData = data;
-      this.render();
-    } catch (err) {
-      console.error('Failed to load model schema:', err);
-      if (this.nodesLayer) {
-        this.nodesLayer.innerHTML = `
+            }
+            const response = await fetch(`/sastry/er/api/${appLabel}/${modelName}/`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            const data = await response.json();
+            this.cache.set(cacheKey, data);
+            this.currentData = data;
+            this.render();
+        }
+        catch (err) {
+            console.error('Failed to load model schema:', err);
+            if (this.nodesLayer) {
+                this.nodesLayer.innerHTML = `
           <div class="alert alert-danger m-4" role="alert">
             <h6 class="alert-heading"><i class="bi bi-exclamation-triangle-fill me-2"></i>Error Loading Schema</h6>
-            <p class="mb-0">${err.message}</p>
+            <p class="mb-0">${err.message || err}</p>
           </div>`;
-      }
+            }
+        }
     }
-  }
-
-  render() {
-    if (!this.currentData || !this.currentData.lvt) return;
-    this.nodesLayer.innerHTML = '';
-
-    const { lvt, foreign, has_many, main_table } = this.currentData;
-
-    // Build active central table card
-    const activeCard = this.createTableCard(main_table, lvt, 'active-table', 'Active Model');
-    this.nodesLayer.appendChild(activeCard);
-
-    // Build reverse relation table cards (has_many)
-    const hasManyKeys = Object.keys(has_many || {});
-    hasManyKeys.forEach(relKey => {
-      const relData = has_many[relKey];
-      const card = this.createTableCard(relKey, relData, 'has-many-table', 'Reverse Relation');
-      this.nodesLayer.appendChild(card);
-    });
-
-    // Build outgoing foreign key table cards (foreign)
-    const foreignKeys = Object.keys(foreign || {});
-    foreignKeys.forEach(fkKey => {
-      const fkData = foreign[fkKey];
-      const card = this.createTableCard(fkKey, fkData, 'foreign-table', 'Foreign Key Target');
-      this.nodesLayer.appendChild(card);
-    });
-
-    // Layout cards into 3 columns (Left: has_many, Center: Active, Right: foreign)
-    this.layoutNodes(hasManyKeys, main_table, foreignKeys);
-
-    // Select primary key field or first field
-    const pkField = lvt.FieldSeq.find(f => lvt[f].ColumnType === 'PrimaryKey') || lvt.FieldSeq[0];
-    this.selectField(pkField);
-
-    // Draw canvas connector lines
-    requestAnimationFrame(() => this.drawConnections());
-  }
-
-  createTableCard(tableKey, data, cardTypeClass, badgeText) {
-    const card = document.createElement('div');
-    card.className = `er-table-card ${cardTypeClass}`;
-    card.id = `er-card-${tableKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-    card.dataset.label = tableKey;
-
-    const shortName = tableKey.includes('.') ? tableKey.split('.')[1] : tableKey;
-    const appName = tableKey.includes('.') ? tableKey.split('.')[0] : '';
-
-    let headerHtml = `
+    render() {
+        if (!this.currentData || !this.currentData.lvt || !this.nodesLayer)
+            return;
+        this.nodesLayer.innerHTML = '';
+        const { lvt, foreign, has_many, main_table } = this.currentData;
+        // Build active central table card
+        const activeCard = this.createTableCard(main_table, lvt, 'active-table', 'Active Model');
+        this.nodesLayer.appendChild(activeCard);
+        // Build reverse relation table cards (has_many)
+        const hasManyKeys = Object.keys(has_many || {});
+        hasManyKeys.forEach(relKey => {
+            const relData = has_many[relKey];
+            const card = this.createTableCard(relKey, relData, 'has-many-table', 'Reverse Relation');
+            this.nodesLayer.appendChild(card);
+        });
+        // Build outgoing foreign key table cards (foreign)
+        const foreignKeys = Object.keys(foreign || {});
+        foreignKeys.forEach(fkKey => {
+            const fkData = foreign[fkKey];
+            const card = this.createTableCard(fkKey, fkData, 'foreign-table', 'Foreign Key Target');
+            this.nodesLayer.appendChild(card);
+        });
+        // Layout cards into 3 columns (Left: has_many, Center: Active, Right: foreign)
+        this.layoutNodes(hasManyKeys, main_table, foreignKeys);
+        // Select primary key field or first field
+        const pkField = lvt.FieldSeq.find(f => {
+            const fieldMeta = lvt[f];
+            return fieldMeta?.ColumnType === 'PrimaryKey';
+        }) || lvt.FieldSeq[0];
+        if (pkField) {
+            this.selectField(pkField);
+        }
+        // Draw canvas connector lines
+        requestAnimationFrame(() => this.drawConnections());
+    }
+    createTableCard(tableKey, data, cardTypeClass, badgeText) {
+        const card = document.createElement('div');
+        card.className = `er-table-card ${cardTypeClass}`;
+        card.id = `er-card-${tableKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+        card.dataset.label = tableKey;
+        const shortName = tableKey.includes('.') ? tableKey.split('.')[1] : tableKey;
+        const appName = tableKey.includes('.') ? tableKey.split('.')[0] : '';
+        let headerHtml = `
       <div class="er-table-header" title="${badgeText}: ${tableKey}">
         <div class="d-flex align-items-center text-truncate">
           <i class="bi ${cardTypeClass === 'active-table' ? 'bi-table' : (cardTypeClass === 'has-many-table' ? 'bi-arrow-left-square-fill' : 'bi-arrow-right-square-fill')} me-2"></i>
@@ -240,279 +241,261 @@ class SastryERDiagram {
       </div>
       <div class="er-table-body">
     `;
-
-    const seq = data.FieldSeq || [];
-    seq.forEach(fieldName => {
-      let colType = 'Text';
-      let kind = null;
-      if (cardTypeClass === 'active-table') {
-        const fInfo = data[fieldName];
-        colType = fInfo ? fInfo.ColumnType : 'Text';
-        kind = fInfo ? fInfo.kind : null;
-      } else {
-        const fTuple = data[fieldName];
-        if (Array.isArray(fTuple)) {
-          colType = fTuple[0];
-          kind = fTuple[1];
-        }
-      }
-
-      const icon = this.icons[colType] || this.icons['Text'];
-      headerHtml += `
+        const seq = data.FieldSeq || [];
+        seq.forEach(fieldName => {
+            let colType = 'Text';
+            let kind = null;
+            if (cardTypeClass === 'active-table') {
+                const fInfo = data[fieldName];
+                colType = fInfo?.ColumnType || 'Text';
+                kind = fInfo?.kind || null;
+            }
+            else {
+                const fTuple = data[fieldName];
+                if (Array.isArray(fTuple)) {
+                    colType = fTuple[0];
+                    kind = fTuple[1];
+                }
+            }
+            const icon = this.icons[colType] || this.icons['Text'];
+            headerHtml += `
         <div class="er-field-row" data-field="${fieldName}" id="er-row-${tableKey.replace(/[^a-zA-Z0-9_-]/g, '_')}-${fieldName}">
           <span class="er-field-icon">${icon}</span>
           <span class="er-field-name ${colType === 'PrimaryKey' ? 'fw-bold' : ''}">${fieldName}</span>
           <span class="er-field-type">${colType === 'ForeignKey' && kind ? (kind.includes('.') ? kind.split('.')[1] : kind) : colType}</span>
         </div>
       `;
-    });
-
-    headerHtml += `</div>`;
-    card.innerHTML = headerHtml;
-    return card;
-  }
-
-  layoutNodes(hasManyKeys, mainTableKey, foreignKeys) {
-    const cardSpacingX = 80;
-    const cardSpacingY = 20;
-    const colWidth = 270;
-
-    const activeCard = document.getElementById(`er-card-${mainTableKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
-    if (!activeCard) return;
-
-    const leftColCount = hasManyKeys.length;
-    const rightColCount = foreignKeys.length;
-
-    // Calculate left positions
-    const col1X = 40;
-    const col2X = leftColCount > 0 ? (col1X + colWidth + cardSpacingX) : 60;
-    const col3X = col2X + colWidth + cardSpacingX;
-
-    // Position center active card
-    let activeY = 40;
-    activeCard.style.left = `${col2X}px`;
-    activeCard.style.top = `${activeY}px`;
-
-    // Position Left Cards (has_many)
-    let leftY = 40;
-    hasManyKeys.forEach(key => {
-      const card = document.getElementById(`er-card-${key.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
-      if (card) {
-        card.style.left = `${col1X}px`;
-        card.style.top = `${leftY}px`;
-        leftY += card.offsetHeight + cardSpacingY;
-      }
-    });
-
-    // Position Right Cards (foreign)
-    let rightY = 40;
-    foreignKeys.forEach(key => {
-      const card = document.getElementById(`er-card-${key.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
-      if (card) {
-        card.style.left = `${col3X}px`;
-        card.style.top = `${rightY}px`;
-        rightY += card.offsetHeight + cardSpacingY;
-      }
-    });
-
-    // Compute bounding canvas dimensions
-    const maxY = Math.max(leftY, rightY, activeY + activeCard.offsetHeight) + 100;
-    const maxX = col3X + colWidth + 100;
-
-    this.nodesLayer.style.width = `${Math.max(maxX, this.viewport.clientWidth)}px`;
-    this.nodesLayer.style.height = `${Math.max(maxY, this.viewport.clientHeight)}px`;
-
-    this.resizeCanvas(Math.max(maxX, this.viewport.clientWidth), Math.max(maxY, this.viewport.clientHeight));
-  }
-
-  resizeCanvas(width, height) {
-    const dpr = window.devicePixelRatio || 1;
-    this.canvas.width = width * dpr;
-    this.canvas.height = height * dpr;
-    this.canvas.style.width = `${width}px`;
-    this.canvas.style.height = `${height}px`;
-
-    const ctx = this.canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-  }
-
-  drawConnections() {
-    if (!this.currentData || !this.canvas) return;
-    const ctx = this.canvas.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
-
-    // Clear canvas
-    ctx.clearRect(0, 0, this.canvas.width / dpr, this.canvas.height / dpr);
-
-    const { lvt, foreign, has_many, main_table } = this.currentData;
-    const activeCardId = `er-card-${main_table.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-    const activeCard = document.getElementById(activeCardId);
-    if (!activeCard) return;
-
-    // Find PK row of active table
-    const pkFieldName = lvt.FieldSeq.find(f => lvt[f].ColumnType === 'PrimaryKey');
-    const activePkRow = pkFieldName ? document.getElementById(`er-row-${main_table.replace(/[^a-zA-Z0-9_-]/g, '_')}-${pkFieldName}`) : null;
-
-    // 1. Draw Incoming Reverse Relations (has_many) -> Pointing to Active Table PK
-    if (activePkRow) {
-      const activePkRect = this.getRelativeRect(activePkRow);
-      const targetAnchorX = activePkRect.left;
-      const targetAnchorY = activePkRect.top + activePkRect.height / 2;
-
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = '#0891b2'; // Cyan/Teal
-      ctx.fillStyle = '#0891b2';
-
-      Object.keys(has_many || {}).forEach(relKey => {
-        const relData = has_many[relKey];
-        const relCardId = `er-card-${relKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-        const relCard = document.getElementById(relCardId);
-        if (!relCard) return;
-
-        // Find field in relData pointing to main_table
-        const seq = relData.FieldSeq || [];
-        seq.forEach(f => {
-          const fTuple = relData[f];
-          if (Array.isArray(fTuple) && fTuple[1] === main_table) {
-            const relRow = document.getElementById(`er-row-${relKey.replace(/[^a-zA-Z0-9_-]/g, '_')}-${f}`);
-            if (relRow) {
-              const relRect = this.getRelativeRect(relRow);
-              const startX = relRect.right;
-              const startY = relRect.top + relRect.height / 2;
-
-              // Draw smooth cubic curve
-              ctx.beginPath();
-              ctx.moveTo(startX, startY);
-              const cp1X = startX + (targetAnchorX - startX) * 0.5;
-              const cp1Y = startY;
-              const cp2X = startX + (targetAnchorX - startX) * 0.5;
-              const cp2Y = targetAnchorY;
-              ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, targetAnchorX, targetAnchorY);
-              ctx.stroke();
-
-              // Draw Arrowhead at active PK left
-              ctx.beginPath();
-              ctx.moveTo(targetAnchorX, targetAnchorY);
-              ctx.lineTo(targetAnchorX - 7, targetAnchorY - 4);
-              ctx.lineTo(targetAnchorX - 7, targetAnchorY + 4);
-              ctx.closePath();
-              ctx.fill();
-            }
-          }
         });
-      });
+        headerHtml += `</div>`;
+        card.innerHTML = headerHtml;
+        return card;
     }
-
-    // 2. Draw Outgoing Foreign Keys (Active Table FK -> Target Table PK)
-    let colorIdx = 0;
-    (lvt.FieldSeq || []).forEach(fieldName => {
-      const fInfo = lvt[fieldName];
-      if (fInfo && fInfo.ColumnType === 'ForeignKey' && fInfo.kind) {
-        const targetKey = fInfo.kind;
-        const targetCardId = `er-card-${targetKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-        const targetCard = document.getElementById(targetCardId);
-        const fkRow = document.getElementById(`er-row-${main_table.replace(/[^a-zA-Z0-9_-]/g, '_')}-${fieldName}`);
-
-        if (targetCard && fkRow) {
-          // Find PK row of target table
-          const targetData = foreign[targetKey];
-          let targetPkField = 'id';
-          if (targetData && targetData.FieldSeq) {
-            targetPkField = targetData.FieldSeq.find(f => {
-              const tup = targetData[f];
-              return Array.isArray(tup) && tup[0] === 'PrimaryKey';
-            }) || 'id';
-          }
-
-          const targetPkRow = document.getElementById(`er-row-${targetKey.replace(/[^a-zA-Z0-9_-]/g, '_')}-${targetPkField}`);
-          if (targetPkRow) {
-            const fkRect = this.getRelativeRect(fkRow);
-            const targetPkRect = this.getRelativeRect(targetPkRow);
-
-            const startX = fkRect.right;
-            const startY = fkRect.top + fkRect.height / 2;
-            const endX = targetPkRect.left;
-            const endY = targetPkRect.top + targetPkRect.height / 2;
-
-            const strokeColor = this.fkColors[colorIdx % this.fkColors.length];
-            colorIdx++;
-
-            ctx.lineWidth = 1.8;
-            ctx.strokeStyle = strokeColor;
-            ctx.fillStyle = strokeColor;
-
-            // Draw connecting bezier curve
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            const cp1X = startX + (endX - startX) * 0.45;
-            const cp1Y = startY;
-            const cp2X = startX + (endX - startX) * 0.55;
-            const cp2Y = endY;
-            ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
-            ctx.stroke();
-
-            // Draw small circle anchor at target PK
-            ctx.beginPath();
-            ctx.arc(endX, endY, 4, 0, 2 * Math.PI);
-            ctx.fill();
-
-            // Draw small dot at start FK
-            ctx.beginPath();
-            ctx.arc(startX, startY, 3, 0, 2 * Math.PI);
-            ctx.fill();
-          }
+    layoutNodes(hasManyKeys, mainTableKey, foreignKeys) {
+        if (!this.viewport || !this.nodesLayer)
+            return;
+        const cardSpacingX = 80;
+        const cardSpacingY = 20;
+        const colWidth = 270;
+        const activeCard = document.getElementById(`er-card-${mainTableKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
+        if (!activeCard)
+            return;
+        const leftColCount = hasManyKeys.length;
+        // Calculate column X coordinates
+        const col1X = 40;
+        const col2X = leftColCount > 0 ? (col1X + colWidth + cardSpacingX) : 60;
+        const col3X = col2X + colWidth + cardSpacingX;
+        // Position center active card
+        const activeY = 40;
+        activeCard.style.left = `${col2X}px`;
+        activeCard.style.top = `${activeY}px`;
+        // Position Left Cards (has_many)
+        let leftY = 40;
+        hasManyKeys.forEach(key => {
+            const card = document.getElementById(`er-card-${key.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
+            if (card) {
+                card.style.left = `${col1X}px`;
+                card.style.top = `${leftY}px`;
+                leftY += card.offsetHeight + cardSpacingY;
+            }
+        });
+        // Position Right Cards (foreign)
+        let rightY = 40;
+        foreignKeys.forEach(key => {
+            const card = document.getElementById(`er-card-${key.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
+            if (card) {
+                card.style.left = `${col3X}px`;
+                card.style.top = `${rightY}px`;
+                rightY += card.offsetHeight + cardSpacingY;
+            }
+        });
+        // Compute bounding canvas dimensions
+        const maxY = Math.max(leftY, rightY, activeY + activeCard.offsetHeight) + 100;
+        const maxX = col3X + colWidth + 100;
+        this.nodesLayer.style.width = `${Math.max(maxX, this.viewport.clientWidth)}px`;
+        this.nodesLayer.style.height = `${Math.max(maxY, this.viewport.clientHeight)}px`;
+        this.resizeCanvas(Math.max(maxX, this.viewport.clientWidth), Math.max(maxY, this.viewport.clientHeight));
+    }
+    resizeCanvas(width, height) {
+        if (!this.canvas)
+            return;
+        const dpr = window.devicePixelRatio || 1;
+        this.canvas.width = width * dpr;
+        this.canvas.height = height * dpr;
+        this.canvas.style.width = `${width}px`;
+        this.canvas.style.height = `${height}px`;
+        const ctx = this.canvas.getContext('2d');
+        if (ctx) {
+            ctx.scale(dpr, dpr);
         }
-      }
-    });
-  }
-
-  getRelativeRect(element) {
-    const elRect = element.getBoundingClientRect();
-    const parentRect = this.nodesLayer.getBoundingClientRect();
-    return {
-      left: elRect.left - parentRect.left,
-      top: elRect.top - parentRect.top,
-      right: elRect.right - parentRect.left,
-      bottom: elRect.bottom - parentRect.top,
-      width: elRect.width,
-      height: elRect.height
-    };
-  }
-
-  selectField(fieldName) {
-    this.selectedField = fieldName;
-
-    // Highlight row in active table
-    const allRows = this.nodesLayer.querySelectorAll('.er-table-card.active-table .er-field-row');
-    allRows.forEach(r => r.classList.remove('selected-field'));
-    const targetRow = document.getElementById(`er-row-${this.currentData.main_table.replace(/[^a-zA-Z0-9_-]/g, '_')}-${fieldName}`);
-    if (targetRow) {
-      targetRow.classList.add('selected-field');
     }
-
-    // Render inspector sidebar
-    this.renderInspector(fieldName);
-  }
-
-  renderInspector(fieldName) {
-    if (!this.inspectorBody || !this.currentData || !this.currentData.lvt) return;
-    const fInfo = this.currentData.lvt[fieldName];
-    if (!fInfo) {
-      this.inspectorBody.innerHTML = `<div class="text-muted small">Select a field to view properties.</div>`;
-      return;
+    drawConnections() {
+        if (!this.currentData || !this.canvas)
+            return;
+        const ctx = this.canvas.getContext('2d');
+        if (!ctx)
+            return;
+        const dpr = window.devicePixelRatio || 1;
+        // Clear canvas
+        ctx.clearRect(0, 0, this.canvas.width / dpr, this.canvas.height / dpr);
+        const { lvt, foreign, has_many, main_table } = this.currentData;
+        const activeCardId = `er-card-${main_table.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+        const activeCard = document.getElementById(activeCardId);
+        if (!activeCard)
+            return;
+        // Find PK row of active table
+        const pkFieldName = lvt.FieldSeq.find(f => {
+            const fieldMeta = lvt[f];
+            return fieldMeta?.ColumnType === 'PrimaryKey';
+        });
+        const activePkRow = pkFieldName ? document.getElementById(`er-row-${main_table.replace(/[^a-zA-Z0-9_-]/g, '_')}-${pkFieldName}`) : null;
+        // 1. Draw Incoming Reverse Relations (has_many) -> Pointing to Active Table PK
+        if (activePkRow) {
+            const activePkRect = this.getRelativeRect(activePkRow);
+            const targetAnchorX = activePkRect.left;
+            const targetAnchorY = activePkRect.top + activePkRect.height / 2;
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = '#0891b2'; // Cyan/Teal
+            ctx.fillStyle = '#0891b2';
+            Object.keys(has_many || {}).forEach(relKey => {
+                const relData = has_many[relKey];
+                const relCardId = `er-card-${relKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+                const relCard = document.getElementById(relCardId);
+                if (!relCard)
+                    return;
+                // Find field in relData pointing to main_table
+                const seq = relData.FieldSeq || [];
+                seq.forEach(f => {
+                    const fTuple = relData[f];
+                    if (Array.isArray(fTuple) && fTuple[1] === main_table) {
+                        const relRow = document.getElementById(`er-row-${relKey.replace(/[^a-zA-Z0-9_-]/g, '_')}-${f}`);
+                        if (relRow) {
+                            const relRect = this.getRelativeRect(relRow);
+                            const startX = relRect.right;
+                            const startY = relRect.top + relRect.height / 2;
+                            // Draw smooth cubic curve
+                            ctx.beginPath();
+                            ctx.moveTo(startX, startY);
+                            const cp1X = startX + (targetAnchorX - startX) * 0.5;
+                            const cp1Y = startY;
+                            const cp2X = startX + (targetAnchorX - startX) * 0.5;
+                            const cp2Y = targetAnchorY;
+                            ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, targetAnchorX, targetAnchorY);
+                            ctx.stroke();
+                            // Draw Arrowhead at active PK left
+                            ctx.beginPath();
+                            ctx.moveTo(targetAnchorX, targetAnchorY);
+                            ctx.lineTo(targetAnchorX - 7, targetAnchorY - 4);
+                            ctx.lineTo(targetAnchorX - 7, targetAnchorY + 4);
+                            ctx.closePath();
+                            ctx.fill();
+                        }
+                    }
+                });
+            });
+        }
+        // 2. Draw Outgoing Foreign Keys (Active Table FK -> Target Table PK)
+        let colorIdx = 0;
+        (lvt.FieldSeq || []).forEach(fieldName => {
+            const fInfo = lvt[fieldName];
+            if (fInfo && fInfo.ColumnType === 'ForeignKey' && fInfo.kind) {
+                const targetKey = fInfo.kind;
+                const targetCardId = `er-card-${targetKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+                const targetCard = document.getElementById(targetCardId);
+                const fkRow = document.getElementById(`er-row-${main_table.replace(/[^a-zA-Z0-9_-]/g, '_')}-${fieldName}`);
+                if (targetCard && fkRow) {
+                    // Find PK row of target table
+                    const targetData = foreign[targetKey];
+                    let targetPkField = 'id';
+                    if (targetData && targetData.FieldSeq) {
+                        targetPkField = targetData.FieldSeq.find(f => {
+                            const tup = targetData[f];
+                            return Array.isArray(tup) && tup[0] === 'PrimaryKey';
+                        }) || 'id';
+                    }
+                    const targetPkRow = document.getElementById(`er-row-${targetKey.replace(/[^a-zA-Z0-9_-]/g, '_')}-${targetPkField}`);
+                    if (targetPkRow) {
+                        const fkRect = this.getRelativeRect(fkRow);
+                        const targetPkRect = this.getRelativeRect(targetPkRow);
+                        const startX = fkRect.right;
+                        const startY = fkRect.top + fkRect.height / 2;
+                        const endX = targetPkRect.left;
+                        const endY = targetPkRect.top + targetPkRect.height / 2;
+                        const strokeColor = this.fkColors[colorIdx % this.fkColors.length];
+                        colorIdx++;
+                        ctx.lineWidth = 1.8;
+                        ctx.strokeStyle = strokeColor;
+                        ctx.fillStyle = strokeColor;
+                        // Draw connecting bezier curve
+                        ctx.beginPath();
+                        ctx.moveTo(startX, startY);
+                        const cp1X = startX + (endX - startX) * 0.45;
+                        const cp1Y = startY;
+                        const cp2X = startX + (endX - startX) * 0.55;
+                        const cp2Y = endY;
+                        ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
+                        ctx.stroke();
+                        // Draw small circle anchor at target PK
+                        ctx.beginPath();
+                        ctx.arc(endX, endY, 4, 0, 2 * Math.PI);
+                        ctx.fill();
+                        // Draw small dot at start FK
+                        ctx.beginPath();
+                        ctx.arc(startX, startY, 3, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
+                }
+            }
+        });
     }
-
-    const { lvt, has_many } = this.currentData;
-
-    let badges = [];
-    if (fInfo.ColumnType === 'PrimaryKey') badges.push('<span class="er-badge-pill badge-pk">Primary Key</span>');
-    if (fInfo.ColumnType === 'ForeignKey') badges.push('<span class="er-badge-pill badge-fk">Foreign Key</span>');
-    if (fInfo.null) badges.push('<span class="er-badge-pill badge-null">Nullable</span>');
-    if (fInfo.blank) badges.push('<span class="er-badge-pill badge-null">Blank</span>');
-    if (fInfo.unique) badges.push('<span class="er-badge-pill badge-uniq">Unique</span>');
-    if (fInfo.dbindex) badges.push('<span class="er-badge-pill badge-idx">Indexed</span>');
-
-    let html = `
+    getRelativeRect(element) {
+        const elRect = element.getBoundingClientRect();
+        const parentRect = this.nodesLayer.getBoundingClientRect();
+        return {
+            left: elRect.left - parentRect.left,
+            top: elRect.top - parentRect.top,
+            right: elRect.right - parentRect.left,
+            bottom: elRect.bottom - parentRect.top,
+            width: elRect.width,
+            height: elRect.height
+        };
+    }
+    selectField(fieldName) {
+        if (!this.nodesLayer || !this.currentData)
+            return;
+        this.selectedField = fieldName;
+        // Highlight row in active table
+        const allRows = this.nodesLayer.querySelectorAll('.er-table-card.active-table .er-field-row');
+        allRows.forEach(r => r.classList.remove('selected-field'));
+        const targetRow = document.getElementById(`er-row-${this.currentData.main_table.replace(/[^a-zA-Z0-9_-]/g, '_')}-${fieldName}`);
+        if (targetRow) {
+            targetRow.classList.add('selected-field');
+        }
+        // Render inspector sidebar
+        this.renderInspector(fieldName);
+    }
+    renderInspector(fieldName) {
+        if (!this.inspectorBody || !this.currentData || !this.currentData.lvt)
+            return;
+        const fInfo = this.currentData.lvt[fieldName];
+        if (!fInfo) {
+            this.inspectorBody.innerHTML = `<div class="text-muted small">Select a field to view properties.</div>`;
+            return;
+        }
+        const { has_many } = this.currentData;
+        const badges = [];
+        if (fInfo.ColumnType === 'PrimaryKey')
+            badges.push('<span class="er-badge-pill badge-pk">Primary Key</span>');
+        if (fInfo.ColumnType === 'ForeignKey')
+            badges.push('<span class="er-badge-pill badge-fk">Foreign Key</span>');
+        if (fInfo.null)
+            badges.push('<span class="er-badge-pill badge-null">Nullable</span>');
+        if (fInfo.blank)
+            badges.push('<span class="er-badge-pill badge-null">Blank</span>');
+        if (fInfo.unique)
+            badges.push('<span class="er-badge-pill badge-uniq">Unique</span>');
+        if (fInfo.dbindex)
+            badges.push('<span class="er-badge-pill badge-idx">Indexed</span>');
+        let html = `
       <div class="er-prop-group">
         <div class="er-prop-label">Field Name</div>
         <div class="er-prop-val fw-bold text-primary font-monospace">${fieldName}</div>
@@ -527,7 +510,7 @@ class SastryERDiagram {
         <div class="er-prop-label">Column / Internal Type</div>
         <div class="er-prop-val">
           <span class="badge bg-secondary me-1">${fInfo.ColumnType}</span>
-          <span class="badge bg-light text-dark border">${fInfo.internal_type}</span>
+          <span class="badge bg-light text-dark border">${fInfo.internal_type || ''}</span>
         </div>
       </div>
 
@@ -536,30 +519,28 @@ class SastryERDiagram {
         <div class="mt-1">${badges.join(' ') || '<span class="text-muted small">Standard field</span>'}</div>
       </div>
     `;
-
-    // If Foreign Key, provide a jump button
-    if (fInfo.ColumnType === 'ForeignKey' && fInfo.kind) {
-      const targetLabel = fInfo.kind;
-      html += `
+        // If Foreign Key, provide a jump button
+        if (fInfo.ColumnType === 'ForeignKey' && fInfo.kind) {
+            const targetLabel = fInfo.kind;
+            html += `
         <div class="er-prop-group mt-3 pt-2 border-top">
           <div class="er-prop-label">Target Reference</div>
           <div class="er-prop-val mb-2 font-monospace small">${targetLabel}</div>
-          <button type="button" class="btn btn-sm btn-outline-primary w-100" onclick="sastryER.jumpToModel('${targetLabel}')">
+          <button type="button" class="btn btn-sm btn-outline-primary w-100" onclick="(window as any).sastryER.jumpToModel('${targetLabel}')">
             <i class="bi bi-box-arrow-in-right me-1"></i> Jump to ${targetLabel.split('.')[1] || targetLabel}
           </button>
         </div>
       `;
-    }
-
-    // If Primary Key, display reverse relation counts
-    if (fInfo.ColumnType === 'PrimaryKey') {
-      const revKeys = Object.keys(has_many || {});
-      html += `
+        }
+        // If Primary Key, display reverse relation counts
+        if (fInfo.ColumnType === 'PrimaryKey') {
+            const revKeys = Object.keys(has_many || {});
+            html += `
         <div class="er-prop-group mt-3 pt-2 border-top">
           <div class="er-prop-label">Referenced By (${revKeys.length} Models)</div>
           <div class="list-group list-group-flush small mt-1">
             ${revKeys.map(k => `
-              <a href="#" class="list-group-item list-group-item-action py-1 px-2 d-flex justify-content-between align-items-center" onclick="sastryER.jumpToModel('${k}'); return false;">
+              <a href="#" class="list-group-item list-group-item-action py-1 px-2 d-flex justify-content-between align-items-center" onclick="(window as any).sastryER.jumpToModel('${k}'); return false;">
                 <span>${k.split('.')[1] || k}</span>
                 <i class="bi bi-chevron-right text-muted" style="font-size:0.7rem"></i>
               </a>
@@ -567,34 +548,30 @@ class SastryERDiagram {
           </div>
         </div>
       `;
+        }
+        this.inspectorBody.innerHTML = html;
     }
-
-    this.inspectorBody.innerHTML = html;
-  }
-
-  jumpToModel(fullLabel) {
-    if (fullLabel && fullLabel.includes('.')) {
-      const [app, mdl] = fullLabel.split('.');
-      this.loadModel(app, mdl);
+    jumpToModel(fullLabel) {
+        if (fullLabel && fullLabel.includes('.')) {
+            const [app, mdl] = fullLabel.split('.');
+            this.loadModel(app, mdl);
+        }
     }
-  }
-
-  redraw() {
-    if (this.currentData) {
-      this.render();
+    redraw() {
+        if (this.currentData) {
+            this.render();
+        }
     }
-  }
 }
-
 // Global initialization helper
 document.addEventListener('DOMContentLoaded', () => {
-  const container = document.getElementById('erDiagramContainer');
-  if (container) {
-    const defaultApp = container.dataset.defaultApp || 'customer';
-    const defaultModel = container.dataset.defaultModel || 'Customer';
-    window.sastryER = new SastryERDiagram({
-      defaultApp,
-      defaultModel
-    });
-  }
+    const container = document.getElementById('erDiagramContainer');
+    if (container) {
+        const defaultApp = container.dataset.defaultApp || 'customer';
+        const defaultModel = container.dataset.defaultModel || 'Customer';
+        window.sastryER = new SastryERDiagram({
+            defaultApp,
+            defaultModel
+        });
+    }
 });
