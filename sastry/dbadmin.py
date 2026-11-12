@@ -157,7 +157,7 @@ def er_view(request):
         mdd[lbl].append(m.__name__)
 
     mdd = {k: sorted(v) for k, v in sorted(mdd.items())}
-    default_app = request.GET.get("app", "customer" if "customer" in mdd else list(mdd.keys())[0])
+    default_app = request.GET.get("app", list(mdd.keys())[0] if mdd else "")
     default_model = request.GET.get(
         "model", mdd[default_app][0] if default_app in mdd and mdd[default_app] else ""
     )
@@ -216,16 +216,10 @@ def optimize_form_querysets(form, rows=None, max_limit=150):
                         if val and isinstance(val, (int, str)) and str(val).isdigit():
                             used_ids.add(int(val))
 
-                model_name = field.queryset.model.__name__
-                if model_name == "Journal":
-                    qs = field.queryset.filter(
-                        Q(name__in=["JO", "SO", "PO"], credit_pending=True) | Q(pk__in=used_ids)
-                    ).order_by("-id")
-                    if not used_ids and max_limit:
-                        qs = qs[:max_limit]
-                    field.queryset = qs
-                elif model_name == "Customer":
-                    field.queryset = field.queryset.select_related("state").all()
+                if used_ids:
+                    field.queryset = field.queryset.filter(pk__in=used_ids)
+                elif max_limit:
+                    field.queryset = field.queryset.all()[:max_limit]
                 else:
                     field.queryset = field.queryset.all()
             except Exception:
@@ -248,9 +242,31 @@ def model(request, app, mdl, dat=None, rd_only=None):
         return JsonResponse(data)
     rows_list = data["rows"]
     data["rows"] = json.dumps(rows_list, default=str)
-    mdl = apps.get_model(app, mdl)
-    data["mdl_form"] = optimize_form_querysets(modelform_factory(mdl, exclude=("id",))(mdl()), rows=rows_list)
+    mdl_cls = apps.get_model(app, mdl)
+    data["mdl_form"] = optimize_form_querysets(modelform_factory(mdl_cls, exclude=("id",))(mdl_cls()), rows=rows_list)
     data["rd_only"] = [] if rd_only == None else rd_only
+
+    is_ajax = (
+        request.headers.get("x-requested-with") == "XMLHttpRequest"
+        or request.headers.get("sec-fetch-dest") == "empty"
+        or request.GET.get("ajax") == "1"
+    )
+    if not is_ajax:
+        mdd = {}
+        for m in apps.get_models():
+            lbl = m._meta.app_label
+            if lbl in ["admin", "contenttypes", "sessions"]:
+                continue
+            if lbl not in mdd:
+                mdd[lbl] = []
+            mdd[lbl].append(m.__name__)
+        data["madmin"] = {k: sorted(v) for k, v in sorted(mdd.items())}
+        data["default"] = True
+        data["sel_app"] = app
+        data["sel_mdl"] = mdl_cls.__name__
+        data["default_model"] = f"{app}_{mdl_cls.__name__}"
+        return render(request, "s_admin.html", data)
+
     return render(request, "s_default.html", data)
 
 
@@ -429,7 +445,7 @@ def mdl_post(request, app, mdl):
                         setattr(mod_del, k.column, None)
                     elif k.has_default():
                         setattr(mod_del, k.column, k.get_default())
-            if getattr(mod_del, "modified_by_id", None):
+            if hasattr(mod_del, "modified_by_id") and request.user.is_authenticated:
                 mod_del.modified_by_id = request.user.id
             if mod_del.__class__.__name__ == "User" and not val["password"].startswith("pbkdf2_sha256"):
                 mod_del.set_password(val["password"])
@@ -463,7 +479,7 @@ def mdl_post(request, app, mdl):
                     setattr(new, k.column, None)
                 elif k.has_default():
                     setattr(new, k.column, k.get_default())
-            if getattr(new, "created_by_id", None):
+            if hasattr(new, "created_by_id") and request.user.is_authenticated:
                 new.created_by_id = request.user.id
             if new.__class__.__name__ == "User" and not val["password"].startswith("pbkdf2_sha256"):
                 new.set_password(val["password"])

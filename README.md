@@ -7,9 +7,10 @@ A lightweight, zero-configuration dynamic CRUD administration interface and inte
 ## Highlights & Features
 
 1. **Interactive Visual Entity Relations (ER) Diagram**:
-   - **Three-Column Centered Layout**: Active model in the center, incoming reverse relations (`has_many`) on the left, and outgoing Foreign Key targets on the right.
-   - **Vector Connection Canvas**: Color-coded relational links with directional arrowheads for reverse relations and circular anchor nodes for foreign key targets.
-   - **Reactive Schema Navigation**: Click any table card header to re-center the entire ER diagram on that model.
+   - **Right-Anchored Selected Model**: The active selected table is anchored to the extreme right, directly adjacent to the field inspector panel, with incoming reverse relations (`has_many` / child tables in cyan) and outgoing foreign key targets (in warm tones) plotted across vertical columns to the left.
+   - **Reactive Schema Navigation**: Click any table card or foreign key to immediately make it the active model and move it to the right, refreshing all its upstream and downstream relations.
+   - **Multi-Column Bin-Packing**: Automatically distributes child and referenced tables across vertical columns to the left to prevent tall single-column spillover for heavily connected models.
+   - **Vector Connection Canvas**: Color-coded relational links with directional arrowheads for child table reverse relations and circular anchor nodes for foreign key targets.
    - **Field-Level Inspector**: Click any field in the active table to view its verbose name, Django internal type, nullability, blankness, uniqueness, database indexes, and reverse references.
 
 2. **Zero-Config Dynamic CRUD**:

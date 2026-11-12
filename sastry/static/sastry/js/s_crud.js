@@ -927,15 +927,42 @@ export class AdminerEdit extends db_crud {
         if (document.getElementById('sel-app')) {
             document.getElementById('sel-app').onchange = (e) => this.setApp(e);
             document.getElementById('app-model').onchange = (e) => this.loadModel(e);
-            // Default to loading customer_Order automatically if landing on the main /sastry/ page
             const path = window.location.pathname;
-            if (path === '/sastry/' || path === '/sastry/index/') {
+            const preRendered = document.getElementById('index');
+            if (preRendered) {
+                const segments = path.split('/').filter(Boolean);
+                const braceIdx = segments.findIndex(s => s === '{}' || s === '%7B%7D');
+                const mdlIdx = braceIdx > 0 ? braceIdx - 1 : segments.length - 1;
+                const appIdx = mdlIdx - 1;
+                if (appIdx >= 0 && mdlIdx >= 0) {
+                    const app = segments[appIdx];
+                    const mdl = segments[mdlIdx];
+                    this.href = (path.startsWith('/sastry/') ? '/sastry/' : '/index/') + app + '/' + mdl + '/';
+                    const selApp = document.getElementById('sel-app');
+                    const appModel = document.getElementById('app-model');
+                    if (selApp)
+                        selApp.value = app;
+                    if (appModel)
+                        appModel.value = `${app}_${mdl}`;
+                }
+                this.setData();
+            }
+            else if (path === '/sastry/' || path === '/sastry/index/' || path === '/' || path === '/index/') {
                 const selApp = document.getElementById('sel-app');
                 const appModel = document.getElementById('app-model');
                 if (selApp && appModel) {
-                    selApp.value = 'customer';
-                    appModel.value = 'customer_Order';
-                    this.loadModel({ target: appModel });
+                    const datalist = document.getElementById('AppMdl');
+                    const options = Array.from(selApp.options).map(o => o.value).filter(Boolean);
+                    const targetApp = options[0];
+                    if (targetApp) {
+                        selApp.value = targetApp;
+                        const modelOpts = datalist ? Array.from(datalist.options).map(o => o.value) : [];
+                        const targetModel = modelOpts.find(v => v.startsWith(targetApp + '_')) || modelOpts[0];
+                        if (targetModel) {
+                            appModel.value = targetModel;
+                            this.loadModel({ target: appModel });
+                        }
+                    }
                 }
             }
         }
