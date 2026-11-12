@@ -142,7 +142,7 @@ def get_model_relations_data(app_label, model_name):
     }
 
 
-@login_required(login_url="/signin?next=sastry/er/")
+@login_required
 def er_view(request):
     """Render the full-featured interactive Entity Relations (ER) diagram."""
     if not (request.user.is_superuser or getattr(request.user, "is_admin", False)):
@@ -173,7 +173,7 @@ def er_view(request):
     )
 
 
-@login_required(login_url="/signin?next=sastry/er/")
+@login_required
 def er_schema_api(request, app_label, model_name):
     """JSON API returning entity relations data for diagram visualization."""
     if not (request.user.is_superuser or getattr(request.user, "is_admin", False)):
@@ -187,7 +187,7 @@ def er_schema_api(request, app_label, model_name):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-@login_required(login_url="/signin?next=sastry/")
+@login_required
 def index(request):
     assert isinstance(request, HttpRequest)
     if not (request.user.is_superuser or getattr(request.user, "is_admin", False)):
@@ -234,7 +234,7 @@ def optimize_form_querysets(form, rows=None, max_limit=150):
 
 
 
-@login_required(login_url="/signin?next=sastry/")
+@login_required
 def model(request, app, mdl, dat=None, rd_only=None):
     if not (request.user.is_superuser or getattr(request.user, "is_admin", False)):
         return HttpResponseForbidden("Access restricted to administrators.")
