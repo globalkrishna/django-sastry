@@ -442,46 +442,60 @@ export class SastryERDiagram {
 
     const totalRelated = hasManyKeys.length + foreignKeys.length;
 
-    // Determine how many columns to use for related tables to the left of the selected table
-    const availableW = Math.max(this.viewport.clientWidth - colWidth - 100, 400);
-    const maxColsByWidth = Math.max(1, Math.floor(availableW / (colWidth + cardSpacingX)));
-    const numCols = totalRelated > 0 ? Math.min(maxColsByWidth, Math.max(1, Math.ceil(totalRelated / 3))) : 0;
+    // How many columns of related tables do we need to the left?
+    // Distribute ~3 tables per column, up to 4 columns
+    const numCols = totalRelated > 0 ? Math.min(4, Math.max(1, Math.ceil(totalRelated / 3))) : 0;
 
-    // Position Selected Active Table on the FAR RIGHT
-    const selectedTableX = numCols > 0 ? (40 + numCols * (colWidth + cardSpacingX)) : 60;
+    // Total width needed to fit numCols columns plus the Selected Table
+    const neededWidth = numCols > 0 
+      ? (40 + numCols * (colWidth + cardSpacingX) + colWidth + 40)
+      : (colWidth + 80);
+
+    // Canvas width is at least the viewport's client width
+    const canvasWidth = Math.max(this.viewport.clientWidth, neededWidth);
+
+    // Position Selected Active Table at the EXTREME RIGHT of the canvas (adjacent to inspector on right)
+    const selectedTableX = canvasWidth - colWidth - 40;
     const selectedTableY = 40;
     activeCard.style.left = `${selectedTableX}px`;
     activeCard.style.top = `${selectedTableY}px`;
 
     if (numCols === 0) {
-      const maxX = selectedTableX + colWidth + 80;
+      const maxX = canvasWidth;
       const maxY = selectedTableY + activeCard.offsetHeight + 80;
-      this.nodesLayer.style.width = `${Math.max(maxX, this.viewport.clientWidth)}px`;
+      this.nodesLayer.style.width = `${maxX}px`;
       this.nodesLayer.style.height = `${Math.max(maxY, this.viewport.clientHeight)}px`;
-      this.resizeCanvas(Math.max(maxX, this.viewport.clientWidth), Math.max(maxY, this.viewport.clientHeight));
+      this.resizeCanvas(maxX, Math.max(maxY, this.viewport.clientHeight));
       return;
+    }
+
+    // Columns are plotted from RIGHT to LEFT starting immediately to the left of Selected Table:
+    // Column 0 is closest to Selected Table, Column 1 to the left of that, etc.
+    const colXCoordinates: number[] = [];
+    for (let c = 0; c < numCols; c++) {
+      colXCoordinates.push(selectedTableX - (c + 1) * (colWidth + cardSpacingX));
     }
 
     // Initialize column Y heights (starting at 40px)
     const colHeights = new Array(numCols).fill(40);
 
-    // Place related table cards using bin-packing (preferring columns closer to the right / selected table)
+    // Place related table cards: filling Column 0 first (closest to Selected Table), then Column 1, Column 2, etc.
     const placeTables = (keys: string[]) => {
       keys.forEach(key => {
         const card = document.getElementById(`er-card-${key.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
         if (!card) return;
 
-        // Find column with minimum height (tie-break: choose higher column index, i.e. closer to selected table)
-        let bestCol = numCols - 1;
-        let minH = colHeights[numCols - 1];
-        for (let c = numCols - 1; c >= 0; c--) {
+        // Find column with minimum height (tie-break: choose lowest column index, i.e. closest to Selected Table)
+        let bestCol = 0;
+        let minH = colHeights[0];
+        for (let c = 0; c < numCols; c++) {
           if (colHeights[c] < minH) {
             minH = colHeights[c];
             bestCol = c;
           }
         }
 
-        const cardX = 40 + bestCol * (colWidth + cardSpacingX);
+        const cardX = colXCoordinates[bestCol];
         const cardY = colHeights[bestCol];
         card.style.left = `${cardX}px`;
         card.style.top = `${cardY}px`;
@@ -495,13 +509,19 @@ export class SastryERDiagram {
 
     // Compute total canvas dimensions
     const maxColHeight = Math.max(...colHeights, selectedTableY + activeCard.offsetHeight);
-    const maxX = selectedTableX + colWidth + 80;
     const maxY = maxColHeight + 80;
 
-    this.nodesLayer.style.width = `${Math.max(maxX, this.viewport.clientWidth)}px`;
+    this.nodesLayer.style.width = `${canvasWidth}px`;
     this.nodesLayer.style.height = `${Math.max(maxY, this.viewport.clientHeight)}px`;
 
-    this.resizeCanvas(Math.max(maxX, this.viewport.clientWidth), Math.max(maxY, this.viewport.clientHeight));
+    this.resizeCanvas(canvasWidth, Math.max(maxY, this.viewport.clientHeight));
+
+    // When content overflows, scroll viewport so the selected table on the extreme right is initially in view
+    if (canvasWidth > this.viewport.clientWidth) {
+      this.viewport.scrollLeft = canvasWidth - this.viewport.clientWidth;
+    } else {
+      this.viewport.scrollLeft = 0;
+    }
   }
 
   private resizeCanvas(width: number, height: number): void {
