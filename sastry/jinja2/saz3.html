@@ -2,36 +2,22 @@
 <html lang="en" data-theme="light">
 
 <head>
-  <title>Shiv Naresh</title>
+  <title>{% block title %}Sastry Admin{% endblock %}</title>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="robots" content="noindex,nofollow" />
-  <meta name="description" content="All kinds of Sports Kits, Fitness Kits and equipments">
-  <meta name="author" content="global">
-  <meta name="keywords"
-    content="Track Suits, T shirts, Half Pants, Kabaddi, football, hockey, judo, taekwondo, athletics, bicycle, cricket ball">
-  <meta name="generator" content="Global Multimedia">
-  <meta http-equiv='cache-control' content='no-cache'>
-  <meta http-equiv='expires' content='0'>
-  <meta http-equiv='pragma' content='no-cache'>
-  <link rel="icon" href="/media/favicon.ico">
-  {#
-  <link type="text/css" rel="stylesheet" href="/static/css/bootstrap.min.css">#}
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
-    integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+  <meta name="description" content="Sastry - Lightweight Dynamic CRUD & Interactive ER Diagram for Django">
+
+  <!-- Bootstrap 5 & Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-  <link type="text/css" rel="stylesheet" href="/static/css/main.css">
-  {#
-  <link type="text/css" rel="stylesheet" href="/static/css/theme.css">#}
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap"
-    rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
   <script>
     // Immediate theme application to prevent flash
     (function () {
@@ -44,12 +30,11 @@
   </script>
   <style>
     body {
-      font-family: 'Roboto-Regular', sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
 
     .card {
-      -webkit-box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.16), 0 2px 10px 0 rgba(0, 0, 0, 0.12);
-      box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.16), 0 2px 10px 0 rgba(0, 0, 0, 0.12);
+      box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.08), 0 2px 10px 0 rgba(0, 0, 0, 0.05);
     }
 
     /* Theme Toggle Icons */
@@ -61,7 +46,6 @@
       cursor: pointer;
     }
 
-    /* Default (Light Mode): Show Moon, Hide Sun */
     .theme-toggle .bi-sun {
       display: none;
     }
@@ -70,7 +54,6 @@
       display: block;
     }
 
-    /* Dark Mode: Show Sun, Hide Moon */
     [data-bs-theme="dark"] .theme-toggle .bi-sun {
       display: block;
     }
@@ -84,9 +67,12 @@
 </head>
 
 <body>
-  <nav class="navbar navbar-expand-md fixed-top container p-0 bg-body-tertiary no-print d-print-none">
+  <nav class="navbar navbar-expand-md fixed-top container-fluid px-3 bg-body-tertiary border-bottom no-print d-print-none">
     <div class="container-fluid">
-      <a class="navbar-brand" href="/?view=catalog"><img src="/media/logo-shiv.png" style="height:3vh"></a>
+      <a class="navbar-brand fw-bold text-primary d-flex align-items-center" href="/sastry/">
+        <i class="bi bi-diagram-3-fill me-2 fs-5"></i>
+        <span>Sastry</span>
+      </a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse"
         aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
@@ -94,123 +80,51 @@
       <div class="collapse navbar-collapse" id="navbarCollapse">
         {% block mainlink %} {% endblock %}
       </div>
-      <button class="theme-toggle me-2 no-print" id="themeToggle" title="Toggle dark mode">
+      
+      <!-- Dark/Light Theme Toggle -->
+      <button class="theme-toggle me-3 no-print" id="themeToggle" title="Toggle dark mode">
         <i class="bi bi-moon"></i>
         <i class="bi bi-sun"></i>
       </button>
+
+      <!-- User Dropdown Menu -->
       <div class="dropdown float-end me-2">
-        {% set un = request.user.first_name if request.user.is_authenticated else 'Guest' %}
-        {% if un | length > 15 %}
-        {% set un = un[:un.index(' ')] if ' ' in un else un[:16] %}
-        {% endif %}
-        <a href="#" class="nav-link dropdown-toggle" id="dropdownUser1" data-bs-toggle="dropdown"
-          data-bs-display="static" aria-expanded="false">{{un}}</a>
-        <ul class="dropdown-menu dropdown-menu-md-end mt-2" aria-labelledby="dropdownUser1">
-          {% if request.user.is_authenticated %}
-          {% if request.user.id in (1,38) or request.user.is_superuser %}
-          <a class="dropdown-item" href="/sastry/">Admin ER</a>
-          <a class="dropdown-item" href="/admin/">Admin</a>
-          <a class="dropdown-item" href="/user/2fa/setup/">🛡️ 2FA Setup & Provisioning</a>
-          <div class="dropdown-divider"></div>
-          {% endif %}
-          {% if request.user.is_admin %}
-          {% if request.session.role %}
-          <h6 class="dropdown-header">Emulate <span class="badge badge-primary">{{request.session.role}}</span></h6>
-          {% if request.session.cust_idn %}
-          <h6 class="dropdown-header">{{request.session.cust_idn[1]}}</h6>
-          {% endif %}
-          <div class="dropdown-divider"></div>
-          {% endif %}
-          <a class="dropdown-item" href="/EmulateRst">Set Emulation</a>
-          <a class="dropdown-item" href="/customer/index/">Customer Orders (New Flow)</a>
-          <a class="dropdown-item" href="/customer/legacy/">Legacy Orders</a>
-          <a class="dropdown-item" href="/customer/invoices/">Customer Invoices</a>
-          <a class="dropdown-item" href="/inventory/index/">Inventory</a>
-          <a class="dropdown-item" href="/inventory/size-chart/">Size Chart / Equ</a>
-          <a class="dropdown-item" href="/sales/index/">Sales POS</a>
-          <a class="dropdown-item" href="/sales/order/">Sale Order</a>
-          <a class="dropdown-item" href="/sales/merchandise/">Merchandise Matrix</a>
-          <a class="dropdown-item" href="/sales/visits/">Field Visits & Audits</a>
-          <a class="dropdown-item fw-bold text-primary" href="/sfa/" target="_blank"><i class="bi bi-phone me-1"></i> Open SFA Portal ↗</a>
-          <a class="dropdown-item" href="/ebo/store/">EBO_FO Admin</a>
-          <a class="dropdown-item" href="/stock/scm/">StockSCM</a>
-          {% if has_accounting_access %}
-          <a class="dropdown-item" href="/acc/">Accounting</a>
-          {% endif %}
-          <a class="dropdown-item" href="/hrm/employee/">HRM</a>
-          <a class="dropdown-item" href="/projects/">Projects</a>
-          {% endif %}
-          {% if not request.user.is_admin %}
-          {% if request.user.zone %}
-          <a class="dropdown-item" href="/inventory/ledger/">Inventory</a>
-          {% else %}
-          {#<a class="dropdown-item" href="/customer/MyProfile/">My Profile</a>#}
-          <a class="dropdown-item" href="/customer/MyOrders/">My Orders</a>
-          {% endif %}
-          {% if request.user.groups.filter(name__in=['projects', 'admin', 'super_admin']).exists() %}
-          <a class="dropdown-item" href="/projects/">Projects</a>
-          {% endif %}
-          {% endif %}
-          <a class="dropdown-item" href="/logout/">Sign Out</a>
-          {% else %}
-          <a class="dropdown-item" href="/signin/">Sign In</a>
-          {% endif %}
-          {% if request.user.id in (1,) %}
-          <div class="dropdown-divider"></div>
-          <a class="dropdown-item" href="/inventory/one_off/reserve">Reset Reserve</a>
-          <a class="dropdown-item" href="/inventory/sync-stock-quantities/">Sync QIS</a>
-          <a class="dropdown-item text-warning" href="#" id="testMyntraBtn"><i class="bi bi-play-circle me-1"></i>Test
-            Myntra API</a>
-          <a class="dropdown-item text-success" href="#" id="testFlipkartBtn"><i class="bi bi-play-circle me-1"></i>Test
-            Flipkart API</a>
-          <a class="dropdown-item text-info" href="#" id="testCustomerBtn"><i
-              class="bi bi-gear-wide-connected me-1"></i>Test ERP & Web API</a>
-          <a class="dropdown-item" href="/sastry/er">Model ER View</a>
-          <a class="dropdown-item" id="pedit" href="/admin/password_change">Edit Profile</a>
-          <div class="dropdown-divider"></div>
-          {% endif %}
+        {% set un = request.user.first_name if request.user.is_authenticated and request.user.first_name else (request.user.username if request.user.is_authenticated else 'Admin') %}
+        <a href="#" class="nav-link dropdown-toggle fw-semibold" id="dropdownUser1" data-bs-toggle="dropdown"
+          data-bs-display="static" aria-expanded="false">
+          <i class="bi bi-person-circle me-1"></i>{{ un }}
+        </a>
+        <ul class="dropdown-menu dropdown-menu-md-end mt-2 shadow-sm" aria-labelledby="dropdownUser1">
+          <li><h6 class="dropdown-header text-uppercase small">Sastry Tools</h6></li>
+          <li><a class="dropdown-item" href="/sastry/"><i class="bi bi-table me-2 text-primary"></i>Data Grid</a></li>
+          <li><a class="dropdown-item" href="/sastry/er/"><i class="bi bi-diagram-3-fill me-2 text-warning"></i>ER Diagram</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item" href="/admin/"><i class="bi bi-shield-lock me-2 text-secondary"></i>Django Admin</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item text-danger" href="/logout/"><i class="bi bi-box-arrow-right me-2"></i>Sign Out</a></li>
         </ul>
       </div>
     </div>
   </nav>
+
   {% block ModalBlock %}{% endblock %}
   {% block CustomModal %}{% endblock %}
-  <main role="main" class="container" style="min-height:88vh;margin-top:50px;">
+
+  <main role="main" class="container-fluid" style="min-height:88vh; margin-top:54px; padding:0;">
     {% block TopNav %}{% endblock %}
     {% block OffCanvas %}{% endblock %}
     <div id="content">
-      {% if request.tenant_industry and request.tenant_industry != 'fashion' %}
-      <div class="alert alert-info shadow-sm d-flex align-items-center mt-3 mb-4" role="alert" style="border-radius: 8px;">
-        <i class="bi bi-info-circle-fill me-3 fs-4"></i>
-        <div>
-          <strong>Welcome to your Sandbox!</strong> 
-          You are currently viewing our flagship <em>Apparel-focused</em> interface. 
-          Your instance will be fully customized for the <strong>{{ request.tenant_industry | capitalize }}</strong> industry during your personalized onboarding.
-        </div>
-      </div>
-      {% endif %}
       {% block content %}{% endblock %}
     </div>
   </main>
-  <footer class="text-center no-print">
-    <div class="container" style="font-size:1rem">
-      <a href="/">Home</a> |
-      <a href="/contact">Contact</a> |
-      <a href="/terms">Terms&amp;Conditions</a> |
-      <a href="/returns">Returns</a> |
-      <a href="/privacy">Privacy</a> |
-      <a href="http://www.saas3.in" style="font-family:'Optima Italic Ex'; font-size:0.6rem"><i
-          class="fas fa-pen-nib"></i>&copy;Global Multimedia, Bengaluru</a>
-      <span class="bg-danger text-white" style="font-size:0.7rem">&copy; Shiv Naresh Sports</span>
+
+  <footer class="text-center py-2 bg-body-tertiary border-top no-print">
+    <div class="container small text-muted">
+      <span>Django Sastry &bull; Lightweight Dynamic CRUD &amp; Entity Relations</span>
     </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"
-      integrity="sha512-a+SUDuwNzXDvz4XrIcXHuCf089/iJAoN4lmrXJg18XnduKK6YlDHNRalv4yd1N40OKI80tFidF+rqTFKGPoWFQ=="
-      crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
-      integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
-      crossorigin="anonymous"></script>
-    {#
-    <script src='/static/js/bootstrap.bundle.min.js'></script>#}
+    
+    <!-- Bootstrap 5 Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
     <script>
       // Theme toggle functionality
       (function () {
@@ -227,485 +141,8 @@
         });
       })();
     </script>
-
-    <!-- Firebase SDKs & Push Notification Setup -->
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js"></script>
-    <script>
-      (function () {
-        if (typeof firebase === 'undefined') return;
-        const firebaseConfig = {
-          apiKey: "AIzaSyBy7RHjOYFbOrOAAXazXiGH4EWQ9rdRubs",
-          authDomain: "saas3-f72a8.firebaseapp.com",
-          projectId: "saas3-f72a8",
-          storageBucket: "saas3-f72a8.firebasestorage.app",
-          messagingSenderId: "997333772628",
-          appId: "1:997333772628:web:2a9f5bb0660a51d35e00c1",
-          measurementId: "G-426GFT7K64"
-        };
-        if (!firebase.apps.length) {
-          firebase.initializeApp(firebaseConfig);
-        }
-
-        if (!('serviceWorker' in navigator) || !('Notification' in window) || !('PushManager' in window)) {
-          return;
-        }
-
-        if (typeof firebase.messaging !== 'function') {
-          return;
-        }
-
-        const initFCM = () => {
-          try {
-            const messaging = firebase.messaging();
-            messaging.getToken({ vapidKey: 'BJX3C_-OU-r09IdZpRnOYtfSpn5BQYsWXTb8O7sFk6UncYJ9wBhGXEWr99ez_jraVSDPNr8oCoqNIC_R-ayQkpQ' }).then((currentToken) => {
-              if (currentToken) {
-                console.log('FCM Token successfully retrieved:', currentToken);
-                if (localStorage.getItem('fcm_token_saved') === currentToken) {
-                  return;
-                }
-                fetch('/api/save-device-token/', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({ token: currentToken })
-                }).then(response => {
-                  if (response.ok) {
-                    localStorage.setItem('fcm_token_saved', currentToken);
-                    console.log('FCM Token successfully saved to Django database!');
-                  } else {
-                    console.warn('Failed to save FCM Token to server: Status', response.status);
-                  }
-                }).catch((err) => {
-                  console.warn('FCM Token save fetch failed:', err);
-                });
-              } else {
-                console.warn('No registration token available. Requesting notification permissions...');
-              }
-            }).catch((err) => {
-              console.warn('FCM Token retrieval failed:', err);
-            });
-
-            // Foreground message handler
-            messaging.onMessage((payload) => {
-              console.log('Received foreground message: ', payload);
-              const title = (payload.notification && payload.notification.title) || (payload.data && payload.data.title) || 'Notification';
-              const body = (payload.notification && payload.notification.body) || (payload.data && payload.data.body) || '';
-              const relativeUrl = (payload.data && payload.data.url) || '/';
-
-              if (Notification.permission === 'granted') {
-                const notificationOptions = {
-                  body: body,
-                  icon: '/media/app_companyandbranch3-im.png',
-                  data: {
-                    url: relativeUrl
-                  }
-                };
-                const notification = new Notification(title, notificationOptions);
-                notification.onclick = (event) => {
-                  event.preventDefault();
-                  window.focus();
-                  window.location.href = relativeUrl;
-                  notification.close();
-                };
-              } else {
-                alert(`${title}\n\n${body}`);
-              }
-            });
-          } catch (e) {
-            console.warn('[FCM] Error initializing messaging:', e);
-          }
-        };
-
-        if (typeof firebase.messaging.isSupported === 'function') {
-          Promise.resolve(firebase.messaging.isSupported()).then((supported) => {
-            if (supported) {
-              initFCM();
-            }
-          }).catch((err) => {
-            console.warn('[FCM] isSupported check failed:', err);
-          });
-        } else {
-          initFCM();
-        }
-      })();
-    </script>
-    <script>
-      (function () {
-        // Test Myntra Mockify API integration handler
-        document.getElementById('testMyntraBtn')?.addEventListener('click', function (e) {
-          e.preventDefault();
-          if (confirm('Run Live Myntra Mockify API integration test?')) {
-            const btn = e.target;
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Testing...';
-            btn.style.pointerEvents = 'none';
-
-            fetch('/api/test-myntra-mockify/')
-              .then(res => res.json())
-              .then(data => {
-                btn.innerHTML = originalText;
-                btn.style.pointerEvents = 'auto';
-                if (data.status === 'success') {
-                  console.log('✅ Myntra Staging Handshake SUCCESS:', data);
-
-                  // Setup Modal Content for Myntra Success
-                  document.getElementById('modalTitleText').innerText = "Myntra PPMP API Test Results";
-
-                  const webBadge = document.getElementById('websiteBadge');
-                  webBadge.className = 'badge bg-success';
-                  webBadge.innerText = 'SUCCESS';
-
-                  const webPre = document.getElementById('websiteResponse');
-                  webPre.innerText = "✅ Authentication Handshake: SUCCESS\n\n" +
-                    "Token Retrieved: " + data.details.token_retrieved + "\n" +
-                    "Staging Stock Push: SUCCESS (SKU1 stock set to 99)\n\n" +
-                    "The application successfully connected to Myntra's Staging environment and performed a complete inventory push handshake.";
-
-                  // Hide second card for Myntra single test
-                  document.getElementById('erpCardContainer').style.display = 'none';
-
-                  // Set Banner Alert
-                  document.getElementById('modalAlertContainer').innerHTML = `
-                    <div class="alert alert-success border-0 shadow-sm d-flex align-items-center mb-3" style="border-radius: 8px;">
-                      <i class="bi bi-check-circle-fill me-2 fs-5 text-success"></i>
-                      <div><strong>Success!</strong> Handshake completed successfully with Myntra PPMP Staging server.</div>
-                    </div>
-                  `;
-
-                  // Show Modal
-                  const resultModal = new bootstrap.Modal(document.getElementById('apiTestResultModal'));
-                  resultModal.show();
-                } else {
-                  console.error('❌ Myntra Staging Handshake FAILED:', data);
-
-                  // Setup Modal Content for Myntra Failure
-                  document.getElementById('modalTitleText').innerText = "Myntra PPMP API Test Results";
-
-                  const webBadge = document.getElementById('websiteBadge');
-                  webBadge.className = 'badge bg-danger';
-                  webBadge.innerText = 'FAILED';
-
-                  const webPre = document.getElementById('websiteResponse');
-                  webPre.innerText = "❌ Connection Exception:\n" + data.message + "\n\n" + (data.traceback || '');
-
-                  // Hide second card
-                  document.getElementById('erpCardContainer').style.display = 'none';
-
-                  // Set Banner Alert
-                  document.getElementById('modalAlertContainer').innerHTML = `
-                    <div class="alert alert-danger border-0 shadow-sm d-flex align-items-center mb-3" style="border-radius: 8px;">
-                      <i class="bi bi-exclamation-triangle-fill me-2 fs-5 text-danger"></i>
-                      <div><strong>Error!</strong> Myntra Staging connection test failed. Details below.</div>
-                    </div>
-                  `;
-
-                  // Show Modal
-                  const resultModal = new bootstrap.Modal(document.getElementById('apiTestResultModal'));
-                  resultModal.show();
-                }
-              })
-              .catch(err => {
-                btn.innerHTML = originalText;
-                btn.style.pointerEvents = 'auto';
-                console.error('❌ Myntra Staging Handshake Network Error:', err);
-
-                // Setup Modal for Network Connection Failures
-                document.getElementById('modalTitleText').innerText = "Myntra PPMP API Test Results";
-
-                const webBadge = document.getElementById('websiteBadge');
-                webBadge.className = 'badge bg-danger';
-                webBadge.innerText = 'NETWORK ERROR';
-
-                const webPre = document.getElementById('websiteResponse');
-                webPre.innerText = "❌ Failed to dispatch request:\n" + err.message;
-
-                document.getElementById('erpCardContainer').style.display = 'none';
-
-                document.getElementById('modalAlertContainer').innerHTML = `
-                  <div class="alert alert-danger border-0 shadow-sm d-flex align-items-center mb-3" style="border-radius: 8px;">
-                    <i class="bi bi-wifi-off me-2 fs-5 text-danger"></i>
-                    <div><strong>Network Error!</strong> The local application failed to communicate with the erp server.</div>
-                  </div>
-                `;
-
-                const resultModal = new bootstrap.Modal(document.getElementById('apiTestResultModal'));
-                resultModal.show();
-              });
-          }
-        });
-
-        // Test Flipkart Mockify API integration handler
-        document.getElementById('testFlipkartBtn')?.addEventListener('click', function (e) {
-          e.preventDefault();
-          if (confirm('Run Live Flipkart Mockify API integration test?')) {
-            const btn = e.target;
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Testing...';
-            btn.style.pointerEvents = 'none';
-
-            fetch('/api/test-flipkart-mockify/')
-              .then(res => res.json())
-              .then(data => {
-                btn.innerHTML = originalText;
-                btn.style.pointerEvents = 'auto';
-                if (data.status === 'success') {
-                  console.log('✅ Flipkart Staging Handshake SUCCESS:', data);
-
-                  // Setup Modal Content for Flipkart Success
-                  document.getElementById('modalTitleText').innerText = "Flipkart FMS API Test Results";
-
-                  const webBadge = document.getElementById('websiteBadge');
-                  webBadge.className = 'badge bg-success';
-                  webBadge.innerText = 'SUCCESS';
-
-                  const webPre = document.getElementById('websiteResponse');
-                  webPre.innerText = "✅ Authentication Handshake: SUCCESS\n\n" +
-                    "Token Retrieved: " + data.details.token_retrieved + "\n" +
-                    "Staging Stock Push: SUCCESS (SKU-FLIPKART stock set to 150)\n\n" +
-                    "The application successfully connected to Flipkart's Staging environment and performed a complete inventory push handshake.";
-
-                  // Hide second card for Flipkart single test
-                  document.getElementById('erpCardContainer').style.display = 'none';
-
-                  // Set Banner Alert
-                  document.getElementById('modalAlertContainer').innerHTML = `
-                    <div class="alert alert-success border-0 shadow-sm d-flex align-items-center mb-3" style="border-radius: 8px;">
-                      <i class="bi bi-check-circle-fill me-2 fs-5 text-success"></i>
-                      <div><strong>Success!</strong> Handshake completed successfully with Flipkart FMS Staging server.</div>
-                    </div>
-                  `;
-
-                  // Show Modal
-                  const resultModal = new bootstrap.Modal(document.getElementById('apiTestResultModal'));
-                  resultModal.show();
-                } else {
-                  console.error('❌ Flipkart Staging Handshake FAILED:', data);
-
-                  // Setup Modal Content for Flipkart Failure
-                  document.getElementById('modalTitleText').innerText = "Flipkart FMS API Test Results";
-
-                  const webBadge = document.getElementById('websiteBadge');
-                  webBadge.className = 'badge bg-danger';
-                  webBadge.innerText = 'FAILED';
-
-                  const webPre = document.getElementById('websiteResponse');
-                  webPre.innerText = "❌ Connection Exception:\n" + data.message + "\n\n" + (data.traceback || '');
-
-                  // Hide second card
-                  document.getElementById('erpCardContainer').style.display = 'none';
-
-                  // Set Banner Alert
-                  document.getElementById('modalAlertContainer').innerHTML = `
-                    <div class="alert alert-danger border-0 shadow-sm d-flex align-items-center mb-3" style="border-radius: 8px;">
-                      <i class="bi bi-exclamation-triangle-fill me-2 fs-5 text-danger"></i>
-                      <div><strong>Error!</strong> Flipkart Staging connection test failed. Details below.</div>
-                    </div>
-                  `;
-
-                  // Show Modal
-                  const resultModal = new bootstrap.Modal(document.getElementById('apiTestResultModal'));
-                  resultModal.show();
-                }
-              })
-              .catch(err => {
-                btn.innerHTML = originalText;
-                btn.style.pointerEvents = 'auto';
-                console.error('❌ Flipkart Staging Handshake Network Error:', err);
-
-                // Setup Modal for Network Connection Failures
-                document.getElementById('modalTitleText').innerText = "Flipkart FMS API Test Results";
-
-                const webBadge = document.getElementById('websiteBadge');
-                webBadge.className = 'badge bg-danger';
-                webBadge.innerText = 'NETWORK ERROR';
-
-                const webPre = document.getElementById('websiteResponse');
-                webPre.innerText = "❌ Failed to dispatch request:\n" + err.message;
-
-                document.getElementById('erpCardContainer').style.display = 'none';
-
-                document.getElementById('modalAlertContainer').innerHTML = `
-                  <div class="alert alert-danger border-0 shadow-sm d-flex align-items-center mb-3" style="border-radius: 8px;">
-                    <i class="bi bi-wifi-off me-2 fs-5 text-danger"></i>
-                    <div><strong>Network Error!</strong> The local application failed to communicate with the erp server.</div>
-                  </div>
-                `;
-
-                const resultModal = new bootstrap.Modal(document.getElementById('apiTestResultModal'));
-                resultModal.show();
-              });
-          }
-        });
-
-        // Test Customer ERP & Web API integration handler
-        document.getElementById('testCustomerBtn')?.addEventListener('click', function (e) {
-          e.preventDefault();
-          const erpDomain = prompt('Enter Customer ERP Domain:', 'erp.saas3.in');
-          if (erpDomain === null) return; // Cancelled
-
-          const webDomain = prompt('Enter Customer Website Domain:', 'shivnaresh.in');
-          if (webDomain === null) return; // Cancelled
-
-          if (confirm(`Run live connection test to ERP (${erpDomain}) and Website (${webDomain})?`)) {
-            const btn = e.target;
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Testing...';
-            btn.style.pointerEvents = 'none';
-
-            fetch(`/api/test-customer-integration/?erp_domain=${encodeURIComponent(erpDomain)}&website_domain=${encodeURIComponent(webDomain)}`)
-              .then(res => res.json())
-              .then(data => {
-                btn.innerHTML = originalText;
-                btn.style.pointerEvents = 'auto';
-                if (data.status === 'success') {
-                  console.log('📊 Customer ERP & Web API Integration Results:', data);
-                  const web = data.results.website_sync;
-                  const erp = data.results.erp_sync;
-
-                  // Setup Modal Content
-                  document.getElementById('modalTitleText').innerText = "Customer ERP & Website Integration Results";
-
-                  // Ensure both cards are visible
-                  document.getElementById('erpCardContainer').style.display = 'block';
-
-                  // Setup Website Display
-                  const webBadge = document.getElementById('websiteBadge');
-                  webBadge.className = 'badge ' + (web.status === 'success' ? 'bg-success' : 'bg-danger');
-                  webBadge.innerText = web.status.toUpperCase();
-
-                  const webPre = document.getElementById('websiteResponse');
-                  if (web.status === 'error') {
-                    webPre.innerText = "❌ Exception Occurred:\n" + web.message;
-                  } else {
-                    webPre.innerText = "✅ Response Payload:\n" + JSON.stringify(web.response, null, 2);
-                  }
-
-                  // Setup ERP Display
-                  const erpBadge = document.getElementById('erpBadge');
-                  erpBadge.className = 'badge ' + (erp.status === 'success' ? 'bg-success' : 'bg-danger');
-                  erpBadge.innerText = erp.status.toUpperCase();
-
-                  const erpPre = document.getElementById('erpResponse');
-                  if (erp.status === 'error') {
-                    erpPre.innerText = "❌ Exception Occurred:\n" + erp.message;
-                  } else {
-                    erpPre.innerText = "✅ Response Payload:\n" + JSON.stringify(erp.response, null, 2);
-                  }
-
-                  // Set Banner Alert based on overall status
-                  const bothSuccess = (web.status === 'success' && erp.status === 'success');
-                  document.getElementById('modalAlertContainer').innerHTML = `
-                    <div class="alert ${bothSuccess ? 'alert-success' : 'alert-warning'} border-0 shadow-sm d-flex align-items-center mb-3" style="border-radius: 8px;">
-                      <i class="bi ${bothSuccess ? 'bi-check-circle-fill text-success' : 'bi-exclamation-circle-fill text-warning'} me-2 fs-5"></i>
-                      <div><strong>Test Complete!</strong> Connection queries executed to both domains. Results are rendered below.</div>
-                    </div>
-                  `;
-
-                  // Show Modal
-                  const resultModal = new bootstrap.Modal(document.getElementById('apiTestResultModal'));
-                  resultModal.show();
-                } else {
-                  console.error('❌ Customer ERP & Web API Integration SYSTEM ERROR:', data);
-                  alert('❌ SYSTEM ERROR:\n\n' + data.message + '\n\nFull traceback printed to developer console.');
-                }
-              })
-              .catch(err => {
-                btn.innerHTML = originalText;
-                btn.style.pointerEvents = 'auto';
-                console.error('❌ Customer ERP & Web API Integration Network Error:', err);
-                alert('❌ Network Error: ' + err.message);
-              });
-          }
-        });
-      })();
-    </script>
-
-    <!-- Beautiful API Test Results Bootstrap Modal -->
-    <div class="modal fade" id="apiTestResultModal" tabindex="-1" aria-labelledby="apiTestResultModalLabel"
-      aria-hidden="true">
-      <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; overflow: hidden;">
-          <div class="modal-header bg-dark text-white py-3 border-0">
-            <h5 class="modal-title d-flex align-items-center" id="apiTestResultModalLabel">
-              <i class="bi bi-cpu-fill text-warning me-2" style="font-size: 1.3rem;"></i>
-              <span id="modalTitleText">API Connection Test Results</span>
-            </h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body p-4 bg-light">
-            <div id="modalAlertContainer"></div>
-
-            <div>
-              <!-- Website / Main Card -->
-              <div class="card border-0 shadow-sm mb-3" style="border-radius: 8px; overflow: hidden;">
-                <div class="card-header bg-white py-2 border-0 d-flex justify-content-between align-items-center">
-                  <span class="fw-bold text-dark d-flex align-items-center" style="font-size: 0.95rem;">
-                    <i class="bi bi-globe2 text-info me-2"></i>Website / Channel Sync
-                  </span>
-                  <span class="badge" id="websiteBadge">-</span>
-                </div>
-                <div class="card-body p-3 bg-dark text-light border-top"
-                  style="font-family: monospace; font-size: 0.85rem; max-height: 180px; overflow-y: auto;">
-                  <pre class="m-0 text-break-all" id="websiteResponse"
-                    style="white-space: pre-wrap; font-family: inherit; color: #a9ffb4;"></pre>
-                </div>
-              </div>
-
-              <!-- ERP Card -->
-              <div class="card border-0 shadow-sm" id="erpCardContainer" style="border-radius: 8px; overflow: hidden;">
-                <div class="card-header bg-white py-2 border-0 d-flex justify-content-between align-items-center">
-                  <span class="fw-bold text-dark d-flex align-items-center" style="font-size: 0.95rem;">
-                    <i class="bi bi-gear-fill text-warning me-2"></i>ERP Integration Sync
-                  </span>
-                  <span class="badge" id="erpBadge">-</span>
-                </div>
-                <div class="card-body p-3 bg-dark text-light border-top"
-                  style="font-family: monospace; font-size: 0.85rem; max-height: 180px; overflow-y: auto;">
-                  <pre class="m-0 text-break-all" id="erpResponse"
-                    style="white-space: pre-wrap; font-family: inherit; color: #a9ffb4;"></pre>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer bg-white border-0 py-3">
-            <button type="button" class="btn btn-secondary border-0 px-4" data-bs-dismiss="modal"
-              style="border-radius: 6px;">Close</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     {% block footer %} {% endblock %}
   </footer>
-  <script src="/static/js/workflow_telemetry.js"></script>
-  {% if request and request.path and '/acc/' in request.path %}
-  <script src="/static/js/acc/shortcuts.js"></script>
-  {% endif %}
-  <script>
-    // Global Double-Click & Rapid Re-submit Protection
-    document.addEventListener('submit', function (e) {
-      var form = e.target;
-      if (!form || form.dataset.submitting === 'true') return;
-      var btn = form.querySelector('button[type="submit"], input[type="submit"]');
-      if (btn && !btn.classList.contains('no-disable')) {
-        form.dataset.submitting = 'true';
-        setTimeout(function () {
-          btn.disabled = true;
-          if (btn.tagName === 'BUTTON') {
-            btn.dataset.origHtml = btn.innerHTML;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Processing...';
-          }
-        }, 50);
-        setTimeout(function () {
-          form.dataset.submitting = 'false';
-          btn.disabled = false;
-          if (btn.dataset.origHtml) btn.innerHTML = btn.dataset.origHtml;
-        }, 15000);
-      }
-    }, true);
-  </script>
 </body>
 
 </html>

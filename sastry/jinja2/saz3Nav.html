@@ -1,39 +1,37 @@
 {% extends "saz3.html" %}
 {% block mainlink %}
-{% if madmin is mapping %}
-<form class="d-flex">
+{% if madmin and madmin is mapping %}
+<form class="d-flex align-items-center">
   {% include 's_HomeLink.html' %}
-  <span class="navbar-text mt-1">App</span>
-  <div class="col-auto mx-2 mt-2">
-    <select class="form-select form-control-sm py-0 my-0" id="sel-app" style="font-size:1rem; font-weight: bold;">
-      <option></option>
+  <span class="navbar-text ms-2 me-1">App</span>
+  <div class="col-auto me-2">
+    <select class="form-select form-select-sm py-0 my-0 fw-bold" id="sel-app" style="font-size:0.9rem;">
+      <option value=""></option>
       {% for mk in madmin.keys() | sort %}
-      <option>{{mk}}</option>
+      <option value="{{mk}}" {% if mk == sel_app %}selected{% endif %}>{{mk}}</option>
       {% endfor %}
     </select>
   </div>
-  <div class="col-auto mt-2">
+  <div class="col-auto">
     <input list="AppMdl" class="form-control form-control-sm py-0 my-0 fw-bold" spellcheck="false"
-      style="font-size:1rem" id="app-model" value="" autocomplete="off"
-      onmousedown="value = document.getElementById('sel-app').value + '_';" />
+      style="font-size:0.9rem;" id="app-model" value="" placeholder="Search model..." autocomplete="off"
+      onmousedown="if(!value && document.getElementById('sel-app').value) value = document.getElementById('sel-app').value + '_';" />
     <datalist id="AppMdl" class="fw-bold">
       {% for mk, mv in madmin | dictsort() %}
-      {% set ml = loop.index %}
       {% for v in mv | sort %}
-      <option class="py-0 my-0" value="{{mk}}_{{v}}"></option>
+      <option value="{{mk}}_{{v}}"></option>
       {% endfor %}
       {% endfor %}
     </datalist>
   </div>
-  <span class="navbar-text text-warning mt-2" onclick="clearFields();" title="Clear">&nbsp;<i
-      class="bi bi-eraser"></i></span>
-  <div class="col-auto ms-3 mt-1">
+  <span class="navbar-text text-warning ms-2" onclick="clearFields();" title="Clear selection" style="cursor:pointer">&nbsp;<i class="bi bi-eraser"></i></span>
+  <div class="col-auto ms-3">
     {% if request.path.startswith('/sastry/er') %}
-    <a href="/sastry/" class="btn btn-sm btn-outline-secondary py-0 my-0 mt-1" title="Switch to CRUD Data Grid">
+    <a href="/sastry/" class="btn btn-sm btn-outline-secondary py-0 my-0" title="Switch to CRUD Data Grid">
       <i class="bi bi-table me-1"></i> Data Grid
     </a>
     {% else %}
-    <a href="/sastry/er/" class="btn btn-sm btn-outline-primary py-0 my-0 mt-1" title="Switch to Visual ER Diagram">
+    <a href="/sastry/er/" class="btn btn-sm btn-outline-primary py-0 my-0" title="Switch to Visual ER Diagram">
       <i class="bi bi-diagram-3-fill me-1"></i> ER Diagram
     </a>
     {% endif %}
@@ -46,6 +44,13 @@
   </script>
 </form>
 {% else %}
-{% include madmin %}
+<ul class="navbar-nav me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="/sastry/"><i class="bi bi-table me-1"></i> Data Grid</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="/sastry/er/"><i class="bi bi-diagram-3-fill me-1"></i> ER Diagram</a>
+  </li>
+</ul>
 {% endif %}
 {% endblock %}
