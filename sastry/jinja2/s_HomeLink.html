@@ -1,0 +1,17 @@
+<li class="nav-item">
+  {% if request.user.groups.filter(name__in=['EBO', 'FO']).exists() %}
+  <a class="nav-link" href="/ebo/"><i class="bi bi-house"></i></a>
+  {% elif request.user.groups.filter(name__in=["admin_inventory",]).exists() %}
+  <a class="nav-link" href="/stock/scm/"><i class="bi bi-house"></i></a>
+  {% elif request.user.groups.filter(name__in=["admin_store",]).exists() %}
+  <a class="nav-link" href="/inventory/index/"><i class="bi bi-house"></i></a>
+  {% elif request.user.groups.filter(name__in=["admin_sales",]).exists() %}
+  <a class="nav-link" href="/customer/index/"><i class="bi bi-house"></i></a>
+  {% elif request.user.groups.filter(name__in=["admin",]).exists() %}
+  <a class="nav-link" href="/sales/index/"><i class="bi bi-house"></i></a>
+  {% elif request.user.groups.filter(name__in=["super_admin",]).exists() %}
+  <a class="nav-link" href="/sastry/"><i class="bi bi-house"></i></a>
+  {% else %}
+  <a class="nav-link" href="/?view=catalog"><i class="bi bi-house"></i></a>
+  {% endif %}
+</li>

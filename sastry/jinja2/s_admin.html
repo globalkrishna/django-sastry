@@ -1,0 +1,40 @@
+{% extends "saz3Nav.html" %}
+{% block ModalBlock %}
+{% include 's_FieldEditModal.html' %}
+{% endblock %}
+{% block content %}
+{% include 's_filter_opt.html' %}
+<div id="content_d">
+  {% if default %}
+  {% include 's_default.html' %}
+  {% else %}
+  <div class="text-center">
+    Click Menu Options
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block footer %}
+<script type="text/template" id='tmp-img'>
+  <div class="card text-center border-primary mt-2">
+    <div class="card-body">
+      <img class="rounded mx-auto d-block" src="<%url%>" style="width:auto; max-width:90%; height:15rem" alt="Card image">
+    </div>
+    <div class="card-footer">
+      <div class="input-group mt-2">
+        <button class="btn btn-sm btn-outline-secondary m-0 px-3 py-2" type="button" id="img-mod">Replace Image</button>
+        <input type="text" class="form-control" readonly accept="image/png, image/jpeg" id="<%idn%>" name="<%idn%>" value="<%url%>" />
+      </div>
+    </div>
+  </div>
+</script>
+<script type="text/template" id='tmp-inp'>
+  <div class="input-group mt-2">
+    <span class="input-group-text text-end" style="min-width:10vw"><%idn%></span>
+    <input type="file" class="form-control"  id="<%idn%>" name="<%idn%>" min="0" value=""/>
+    <label class="input-group-text" for="<%idn%>">Choose file</label>
+  </div>
+</script>
+<script type="module" src="/static/js/core/utils/s_crud.js"></script>
+<script type="module" src="/static/js/core/utils/sastry.js"></script>
+{% endblock %}

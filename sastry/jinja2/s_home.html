@@ -1,0 +1,284 @@
+<style>
+  @keyframes pulse-red-alert {
+    0% {
+      transform: scale(0.92);
+      box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+    }
+
+    70% {
+      transform: scale(1.08);
+      box-shadow: 0 0 0 6px rgba(220, 38, 38, 0);
+    }
+
+    100% {
+      transform: scale(0.92);
+      box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+    }
+  }
+
+  .fulfillment-pulse-badge {
+    animation: pulse-red-alert 2s infinite;
+    font-size: 0.68rem;
+    padding: 0.22em 0.52em;
+    vertical-align: middle;
+  }
+
+  [data-bs-theme="dark"] .dropdown-header,
+  [data-theme="dark"] .dropdown-header {
+    color: #94a3b8 !important;
+  }
+</style>
+<ul class="navbar-nav me-auto mb-2 mb-lg-0">
+  {% include "s_HomeLink.html" %}
+  <li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle{% if '/customer/' in request.path%} active{%endif%}" data-bs-toggle="dropdown"
+      href="#" role="button">Customer</a>
+    {% set cust_links = {'/customer/list/': 'List',
+    '/customer/index/': 'Orders',
+    '/customer/legacy/': 'Legacy Orders',
+    '/customer/sales_booking/': 'Credit Approval',
+    '/customer/channel_orders/': 'Channel Orders',
+    '/customer/invoices/': 'Invoices',
+    '/customer/eInvoice/': 'eInvoices',
+    '/customer/eWayBill/': 'eWayBill',
+    '/customer/migrate/':'MigrateInvoices'}%}
+    <div class="dropdown-menu">
+      {% for link, label in cust_links.items()%}
+      <a class="dropdown-item{% if link == request.path%} active{%endif%}" href="{{link}}">{{label}}</a>
+      {% endfor %}
+    </div>
+  </li>
+  {% set links = {'/inventory/index/':'Edit',
+  '/inventory/index/best/':'Edit Best Seller',
+  '/inventory/vendors/':'Vendors',
+  '/inventory/base_model/':'Base Models',
+  '/inventory/ledger/':'Ledgers',
+  '/inventory/report/':'Stock Report',
+  '/inventory/InventoryList/':'Stock List',
+  '/inventory/stockBS/':'Stock BS',
+  '/inventory/size-chart/':'Size Chart / Equ',
+  '/inventory/label/':'Label',
+  '/inventory/pricelist/':'Price List',
+  '/inventory/fabric/':'Fabric DrCr',
+  '/inventory/image-dashboard/':'Image Dashboard',
+  '/inventory/export-missing-fabric-colors/':'Missing Fabric Colors',
+  '/inventory/newitem/':'New Item'} %}
+  <li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle{% if request.path in links %} active{%endif%}" data-bs-toggle="dropdown" href="#"
+      role="button">Inventory</a>
+    <div class="dropdown-menu">
+      {% for link, label in links.items()%}
+      <a class="dropdown-item{% if link == request.path%} active{%endif%}" href="{{link}}">{{label}}</a>
+      {% endfor %}
+    </div>
+  </li>
+  {% set links = {'/inventory/PartList/':'Part List',
+  '/inventory/PartList/best/':'PartList BS',
+  '/inventory/navigation/':'Navigation',
+  '/inventory/ReOrder/':'ReOrder',
+  '/inventory/ReOrderBest/':'ReOrder BS',
+  '/inventory/BOMAudit/':'Fabric BOM Audit'} %}
+  <li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle{% if request.path in links %} active{%endif%}" data-bs-toggle="dropdown" href="#"
+      role="button">BOM</a>
+    <div class="dropdown-menu">
+      {% for link, label in links.items()%}
+      <a class="dropdown-item{% if link == request.path%} active{%endif%}" href="{{link}}">{{label}}</a>
+      {% endfor %}
+    </div>
+  </li>
+  <li class="nav-item dropdown">
+    {% set slink= {'/sales/order/': 'New Order',
+    '/sales/bespoke/': 'Bespoke Order',
+    '/sales/index/': 'POS',
+    '/sales/merchandise/': 'Merchandise Matrix',
+    '/sales/visits/': 'Field Visits & Audits',
+    '/sales/report/': 'Report',
+    '/sales/SalesData/': 'SalesData',
+    '/sales/AggregateSales/': 'AggregateSales',
+    '/sales/AggregateJournals/': 'AggregateJournals'}%}
+    <a class="nav-link dropdown-toggle{% if request.path in slink or '/sfa/' in request.path or '/b2b/' in request.path %} active{%endif%}"
+      data-bs-toggle="dropdown" href="#" role="button">Sales</a>
+    <div class="dropdown-menu">
+      <a class="dropdown-item fw-bold text-primary" href="/sfa/" target="_blank"><i class="bi bi-phone me-1"></i> Open
+        SFA Portal ↗</a>
+      <div class="dropdown-divider"></div>
+      {% for link, label in slink.items()%}
+      <a class="dropdown-item{% if link == request.path%} active{%endif%}" href="{{link}}">{{label}}</a>
+      {% endfor %}
+    </div>
+  </li>
+  {% if has_ecomm_access %}
+  <li class="nav-item dropdown">
+    {% set ecommlink = {
+    '/sales/delhivery/': 'Fulfillment & Logistics',
+    '/inventory/InventoryList/': 'Multi-WH Stock Explorer',
+    '/stock/makelist/': 'Store Make List (SR)',
+    '/stock/scm/': 'Allocation Manager (SCM)',
+    '/stock/jrnl/': 'Stock Transfer Journals',
+    '/inventory/image-dashboard/': 'Product Image Dashboard',
+    '/app/landing/': 'Landing Page CMS',
+    '/?view=catalog': 'Live Storefront'
+    } %}
+    <a class="nav-link dropdown-toggle{% if '/delhivery/' in request.path or '/app/landing/' in request.path or request.path in ecommlink %} active{% endif %}"
+      data-bs-toggle="dropdown" href="#" role="button">
+      E-Comm{% if pending_fulfillment_total %}<span class="badge rounded-pill bg-danger fulfillment-pulse-badge ms-1"
+        title="{{ pending_fulfillment_total }} pending fulfillment orders">{{ pending_fulfillment_total }}</span>{%
+      endif %}
+    </a>
+    <div class="dropdown-menu">
+      <h6 class="dropdown-header text-uppercase" style="font-size:0.68rem; letter-spacing:0.5px; color:#6b7280;">Orders
+        & Fulfillment</h6>
+      <a class="dropdown-item d-flex justify-content-between align-items-center{% if request.path == '/sales/delhivery/' %} active{% endif %}"
+        href="/sales/delhivery/">
+        <span>🚚 Fulfillment Dashboard</span>
+        {% if pending_fulfillment_total %}<span class="badge rounded-pill bg-danger ms-2">{{ pending_fulfillment_total
+          }}</span>{% endif %}
+      </a>
+      <div class="dropdown-divider"></div>
+      <h6 class="dropdown-header text-uppercase" style="font-size:0.68rem; letter-spacing:0.5px; color:#6b7280;">
+        Inventory & Stock</h6>
+      <a class="dropdown-item{% if request.path == '/inventory/InventoryList/' %} active{% endif %}"
+        href="/inventory/InventoryList/">📦 Multi-WH Stock Explorer</a>
+      <a class="dropdown-item{% if request.path == '/stock/makelist/' %} active{% endif %}" href="/stock/makelist/">⚡
+        Store Make List (SR)</a>
+      <a class="dropdown-item{% if request.path == '/stock/scm/' %} active{% endif %}" href="/stock/scm/">🏭 Allocation
+        Manager (SCM)</a>
+      <a class="dropdown-item{% if request.path == '/stock/jrnl/' %} active{% endif %}" href="/stock/jrnl/">📑 Warehouse
+        Stock Journals</a>
+      <div class="dropdown-divider"></div>
+      <h6 class="dropdown-header text-uppercase" style="font-size:0.68rem; letter-spacing:0.5px; color:#6b7280;">Catalog
+        & Merchandising</h6>
+      <a class="dropdown-item{% if request.path == '/inventory/image-dashboard/' %} active{% endif %}"
+        href="/inventory/image-dashboard/">🖼️ Product Image Dashboard</a>
+      <a class="dropdown-item{% if request.path == '/app/landing/' %} active{% endif %}" href="/app/landing/">🎨 Landing
+        Page CMS</a>
+      <a class="dropdown-item fw-bold text-primary" href="/?view=catalog" target="_blank">🌐 Live Storefront ↗</a>
+    </div>
+  </li>
+  {% endif %}
+  {% if has_store_manager_access or has_allocation_access %}
+  <li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button">Stock</a>
+    <div class="dropdown-menu">
+      {% if has_store_manager_access %}
+      <h6 class="dropdown-header text-uppercase" style="font-size:0.68rem; letter-spacing:0.5px; color:#6b7280;">Store Management</h6>
+      <a class="dropdown-item{% if request.path == '/stock/jrnl/' %} active{%endif%}" id="Journals" href="/stock/jrnl/">Journals</a>
+      <a class="dropdown-item{% if request.path == '/stock/SetWarehouse/' %} active{%endif%}" id="SetWarehouse" href="/stock/SetWarehouse/">SetWarehouse</a>
+      <a class="dropdown-item{% if request.path == '/stock/trace/' %} active{%endif%}" id="Journal Trace" href="/stock/trace/">Journal Trace</a>
+      <a class="dropdown-item{% if request.path == '/stock/waybill/' %} active{%endif%}" id="Waybill for ST" href="/stock/waybill/">Waybill for ST</a>
+      <a class="dropdown-item{% if request.path == '/stock/rollback/' %} active{%endif%}" id="Rollback" href="/stock/rollback/">Rollback</a>
+      <a class="dropdown-item{% if request.path == '/stock/JrnlRep/' %} active{%endif%}" id="Journal Report" href="/stock/JrnlRep/">Journal Report</a>
+      {% endif %}
+      {% if has_allocation_access %}
+      {% if has_store_manager_access %}<div class="dropdown-divider"></div>{% endif %}
+      <h6 class="dropdown-header text-uppercase" style="font-size:0.68rem; letter-spacing:0.5px; color:#6b7280;">Central SCM</h6>
+      <a class="dropdown-item{% if request.path == '/inventory/vendors/' %} active{%endif%}" id="Vendors Directory" href="/inventory/vendors/">Vendors Directory</a>
+      <a class="dropdown-item{% if request.path == '/stock/scm/' %} active{%endif%}" id="Order Management" href="/stock/scm/">Order Management</a>
+      <a class="dropdown-item{% if request.path == '/stock/scm/SplitSJP/' %} active{%endif%}" id="Split SJP Orders" href="/stock/scm/SplitSJP/">Split SJP Orders</a>
+      <a class="dropdown-item{% if request.path == '/stock/scm/AllocateBOM/' %} active{%endif%}" id="Allocate BOM" href="/stock/scm/AllocateBOM/">Allocate BOM</a>
+      <a class="dropdown-item{% if request.path == '/stock/scm/MakeGR/' %} active{%endif%}" id="Create GR" href="/stock/scm/MakeGR/">Create GR</a>
+      {% endif %}
+    </div>
+  </li>
+  {% endif %}
+  {% if has_accounting_access %}
+  <li class="nav-item dropdown">
+    {% set alink = {
+    '/acc/': 'Dashboard',
+    '/acc/coa/': 'Chart of Accounts',
+    '/acc/ledger/': 'Ledgers',
+    '/customer/list/': 'Customers (Debtors)',
+    '/inventory/vendors/': 'Vendors (Creditors)',
+    '/acc/voucher/': 'Vouchers',
+    '/acc/journal/': 'Journal',
+    '/acc/daybook/': 'Day Book',
+    '---reports': 'Financial Reports',
+    '/acc/trial-balance/': 'Trial Balance',
+    '/acc/profit-loss/': 'Profit & Loss',
+    '/acc/balance-sheet/': 'Balance Sheet',
+    '/acc/ledger/ageing/': 'Ledger Ageing',
+    '/acc/purchase-register/': 'Purchase Register',
+    '---tools': 'Reconciliation & Tools',
+    '/acc/tally/': 'Tally Reconciliation',
+    '/acc/fiscal/': 'Fiscal Year',
+    '/acc/tally-guide/': '📖 Tally User Guide'} %}
+    <a class="nav-link dropdown-toggle{% if request.path in alink %} active{%endif%}" data-bs-toggle="dropdown" href="#"
+      role="button">Accounting</a>
+    <div class="dropdown-menu shadow">
+      <h6 class="dropdown-header text-uppercase d-flex justify-content-between align-items-center"
+        style="font-size: 0.72rem; letter-spacing: 0.5px;">
+        <span>Active FY</span>
+        <span class="badge bg-primary rounded-pill">{{ request.session.get('active_fy', '25-26') }}</span>
+      </h6>
+      <a class="dropdown-item d-flex justify-content-between align-items-center py-1" href="/acc/set-fy/?fy=25-26">
+        <span>FY 2025–26 (Closed)</span>
+        {% if request.session.get('active_fy', '25-26') == '25-26' %}<i
+          class="bi bi-check-circle-fill text-primary"></i>{% endif %}
+      </a>
+      <a class="dropdown-item d-flex justify-content-between align-items-center py-1" href="/acc/set-fy/?fy=26-27">
+        <span>FY 2026–27 (Current)</span>
+        {% if request.session.get('active_fy') == '26-27' %}<i class="bi bi-check-circle-fill text-primary"></i>{% endif
+        %}
+      </a>
+      <div class="dropdown-divider"></div>
+      {% for link, label in alink.items()%}
+      {% if link.startswith('---') %}
+      <div class="dropdown-divider"></div>
+      <h6 class="dropdown-header">{{ label }}</h6>
+      {% else %}
+      <a class="dropdown-item{% if link == request.path%} active{%endif%}" href="{{link}}">{{label}}</a>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </li>
+  {% endif %}
+  <li class="nav-item dropdown">
+    {% set hlink = {
+    '/hrm/employee/': 'Employees',
+    '/hrm/leave/': 'Leave Records',
+    '/hrm/comp/': 'Compensation',
+    '/hrm/timesheet/': 'Timesheets'} %}
+    <a class="nav-link dropdown-toggle{% if request.path in hlink %} active{%endif%}" data-bs-toggle="dropdown" href="#"
+      role="button">HRM</a>
+    <div class="dropdown-menu">
+      {% for link, label in hlink.items()%}
+      <a class="dropdown-item{% if link == request.path%} active{%endif%}" href="{{link}}">{{label}}</a>
+      {% endfor %}
+    </div>
+  </li>
+  {% if has_job_order_access %}
+  <li class="nav-item dropdown">
+    {% set sjplink = {
+    '/sjp/': 'Dashboard',
+    '/sjp/cards/': 'Production Cards',
+    '/sjp/fabricators/': 'Fabricator Directory',
+    '/sjp/capacity/': 'Capacity Planning',
+    '/sjp/work-study/': 'Work Study & SAM',
+    '/sjp/scorecard/': 'Vendor Scorecards',
+    '/sjp/materials/': 'Material Requirement'} %}
+    <a class="nav-link dropdown-toggle{% if '/sjp/' in request.path %} active{%endif%}" data-bs-toggle="dropdown"
+      href="#" role="button">SJP</a>
+    <div class="dropdown-menu">
+      {% for link, label in sjplink.items() %}
+      <a class="dropdown-item{% if link == request.path%} active{%endif%}" href="{{link}}">{{label}}</a>
+      {% endfor %}
+    </div>
+  </li>
+  {% endif %}
+  {% if request.user.is_superuser or request.user.is_admin or request.user.groups.filter(name__in=['super_admin', 'admin',
+  'projects']).exists() %}
+  <li class="nav-item dropdown">
+    {% set projlink = {
+    '/projects/': 'Dashboard',
+    '/projects/transactions/': 'Transactions & Material'} %}
+    <a class="nav-link dropdown-toggle{% if '/projects/' in request.path %} active{%endif%}" data-bs-toggle="dropdown"
+      href="#" role="button">Projects</a>
+    <div class="dropdown-menu">
+      {% for link, label in projlink.items() %}
+      <a class="dropdown-item{% if link == request.path%} active{%endif%}" href="{{link}}">{{label}}</a>
+      {% endfor %}
+    </div>
+  </li>
+  {% endif %}
+</ul>

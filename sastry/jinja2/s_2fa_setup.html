@@ -1,0 +1,300 @@
+{% extends "saz3.html" %}
+{% block content %}
+<style id="twofa-contrast-styles">
+  .twofa-container {
+    --twofa-card-bg: var(--bs-card-bg, #ffffff);
+    --twofa-card-border: var(--bs-border-color, rgba(0, 0, 0, 0.12));
+    --twofa-text-main: var(--bs-body-color, #1e293b);
+    --twofa-text-muted: var(--bs-secondary-color, #64748b);
+    --twofa-heading: var(--bs-emphasis-color, #0f172a);
+    --twofa-active-box-bg: rgba(22, 163, 74, 0.08);
+    --twofa-active-box-border: rgba(22, 163, 74, 0.25);
+    --twofa-active-box-text: #15803d;
+    --twofa-section-bg: var(--bs-tertiary-bg, #f8fafc);
+    --twofa-section-border: var(--bs-border-color, #e2e8f0);
+    --twofa-input-bg: var(--bs-body-bg, #ffffff);
+    --twofa-input-color: var(--bs-body-color, #0f172a);
+    --twofa-input-border: var(--bs-border-color, #cbd5e1);
+  }
+
+  [data-bs-theme="dark"] .twofa-container,
+  [data-theme="dark"] .twofa-container {
+    --twofa-card-bg: #1e293b;
+    --twofa-card-border: rgba(255, 255, 255, 0.12);
+    --twofa-text-main: #e2e8f0;
+    --twofa-text-muted: #94a3b8;
+    --twofa-heading: #ffffff;
+    --twofa-active-box-bg: rgba(34, 197, 94, 0.12);
+    --twofa-active-box-border: rgba(34, 197, 94, 0.3);
+    --twofa-active-box-text: #4ade80;
+    --twofa-section-bg: rgba(15, 23, 42, 0.6);
+    --twofa-section-border: rgba(255, 255, 255, 0.1);
+    --twofa-input-bg: #0f172a;
+    --twofa-input-color: #f8fafc;
+    --twofa-input-border: rgba(255, 255, 255, 0.18);
+  }
+
+  .twofa-container .card-main {
+    background: var(--twofa-card-bg) !important;
+    border: 1px solid var(--twofa-card-border) !important;
+    color: var(--twofa-text-main) !important;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  }
+
+  .twofa-container h4,
+  .twofa-container h5,
+  .twofa-container h6 {
+    color: var(--twofa-heading) !important;
+  }
+
+  .twofa-container .text-muted,
+  .twofa-container small.text-muted {
+    color: var(--twofa-text-muted) !important;
+  }
+
+  .twofa-container .active-protection-panel {
+    background: var(--twofa-active-box-bg);
+    border: 1px solid var(--twofa-active-box-border);
+    border-radius: 12px;
+  }
+
+  .twofa-container .active-protection-panel strong {
+    color: var(--twofa-active-box-text);
+  }
+
+  .twofa-container .admin-card {
+    background: var(--twofa-section-bg) !important;
+    border: 1px solid var(--twofa-section-border) !important;
+    border-radius: 12px;
+  }
+
+  .twofa-container .form-control {
+    background-color: var(--twofa-input-bg) !important;
+    color: var(--twofa-input-color) !important;
+    border-color: var(--twofa-input-border) !important;
+  }
+
+  .twofa-container .form-control:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25) !important;
+  }
+
+  .twofa-container .form-control::placeholder {
+    color: var(--twofa-text-muted) !important;
+    opacity: 0.7;
+  }
+
+  .twofa-container .btn-back {
+    color: var(--twofa-text-muted) !important;
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+  .twofa-container .btn-back:hover {
+    color: var(--twofa-heading) !important;
+  }
+</style>
+
+<div class="container twofa-container" style="max-width: 600px; margin-top: 40px; margin-bottom: 60px;">
+  <div class="card card-main p-4 p-md-5">
+    <div class="d-flex align-items-center mb-4">
+      <div class="p-2 rounded-3 me-3" style="background: rgba(59, 130, 246, 0.1); font-size: 2rem; line-height: 1;">🛡️</div>
+      <div>
+        <h4 class="mb-1 fw-bold">Google Authenticator (2FA)</h4>
+        <small class="text-muted">Account Security for <strong style="color: var(--twofa-heading);">{{ user.email }}</strong></small>
+      </div>
+      <div class="ms-auto">
+        {% if is_enabled %}
+        <span class="badge bg-success px-3 py-2 rounded-pill shadow-sm" style="font-size: 0.85rem; font-weight: 600;">Active</span>
+        {% else %}
+        <span class="badge bg-warning text-dark px-3 py-2 rounded-pill shadow-sm" style="font-size: 0.85rem; font-weight: 600;">Disabled</span>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if message %}
+    <div class="alert alert-success d-flex align-items-center py-2 px-3 mb-3 rounded-3" style="font-size: 0.88rem;">
+      <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+      <div>{{ message }}</div>
+    </div>
+    {% endif %}
+    {% if error and not ip_blocked %}
+    <div class="alert alert-danger d-flex align-items-center py-2 px-3 mb-3 rounded-3" style="font-size: 0.88rem;">
+      <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+      <div>{{ error }}</div>
+    </div>
+    {% endif %}
+
+    {% if is_enabled %}
+    <div class="active-protection-panel p-4 my-3 text-center">
+      <div class="mb-2" style="font-size: 1.8rem;">✅</div>
+      <p style="font-size: 1.05rem; font-weight: 700; margin-bottom: 6px;">Two-Factor Authentication is currently protecting your account.</p>
+      <p class="text-muted mb-4 small">Every time you sign in, you will be prompted for a 6-digit code from Google Authenticator.</p>
+      <a href="/" class="btn btn-success px-4 py-2 fw-semibold shadow-sm rounded-3">
+        Proceed to ERP Dashboard &rarr;
+      </a>
+      {% if last_used_at %}
+      <div class="mt-3 text-muted small">Last verified: {{ last_used_at }}</div>
+      {% endif %}
+    </div>
+
+    {% if user.is_superuser %}
+    <hr class="my-4" style="opacity: 0.15;">
+    <div class="admin-card p-3 p-md-4 mt-3">
+      <h6 class="fw-bold mb-1">Emergency Reset / Disable (Superuser Only)</h6>
+      <p class="text-muted small mb-3">Enter your current password to turn off two-factor authentication.</p>
+      <form action="/user/2fa/setup/" method="POST">
+        {{ csrf_input }}
+        <input type="hidden" name="action" value="disable">
+        <div class="input-group">
+          <input type="password" name="password" class="form-control" placeholder="Current Password" required>
+          <button class="btn btn-outline-danger fw-semibold px-3" type="submit">Disable 2FA</button>
+        </div>
+      </form>
+    </div>
+    {% else %}
+    <div class="admin-card p-3 mt-3 text-muted small">
+      ℹ️ <strong>Security Policy:</strong> Two-factor authentication is mandatory for all accounts. To transfer 2FA to a new phone, contact the system administrator.
+    </div>
+    {% endif %}
+    {% else %}
+    <!-- Enrollment Flow -->
+    {% if ip_blocked %}
+    <div class="alert alert-danger p-4 mb-3 rounded-3" style="border-left: 5px solid #dc3545;">
+      <div class="d-flex align-items-center mb-2">
+        <span style="font-size: 1.8rem; margin-right: 12px;">🚫</span>
+        <div>
+          <h5 class="mb-0 text-danger fw-bold">Restricted Enrollment Network</h5>
+          <small class="text-muted">On-Premises Wi-Fi or Administrator Authorization Required</small>
+        </div>
+      </div>
+      <hr style="margin: 12px 0; opacity: 0.15;">
+      <p class="mb-2 fw-semibold text-danger">
+        2FA registration must be completed on company premises or authorized by an administrator.
+      </p>
+      <p class="text-muted mb-3 small" style="line-height: 1.5;">
+        To prevent unauthorized account takeovers from stolen passwords, linking a new Authenticator device is strictly restricted to designated company locations (Head Office, Warehouse, Factory, or Retail Store Wi-Fi).
+      </p>
+      <div class="p-2 admin-card rounded text-muted small mb-3">
+        <strong>Your Current IP Address:</strong> <code>{{ client_ip or "Unknown" }}</code><br>
+        Staff on premises must connect to company Wi-Fi. EBO stores and dealers must verify via email below.
+      </div>
+
+      <div class="admin-card p-3 rounded-3 border-primary" style="border-left: 4px solid #0d6efd !important;">
+        <h6 class="text-primary fw-bold mb-1">
+          {% if is_ebo %}🏪 EBO Retail Outlet Email Verification{% else %}✉️ External / Out-of-Office Verification{% endif %}
+        </h6>
+        <p class="text-muted small mb-3" style="line-height: 1.5;">
+          {% if is_ebo %}EBO store accounts are located outside head office and{% else %}Accounts connecting from outside head office{% endif %} must verify identity via registered email. Click below to receive a secure, one-time 2FA activation link at <strong>{{ masked_email }}</strong>.
+        </p>
+        <form action="/user/2fa/setup/" method="POST">
+          {{ csrf_input }}
+          <input type="hidden" name="action" value="send_email_verification">
+          <button type="submit" class="btn btn-primary btn-sm fw-bold px-3 py-2 rounded-3 shadow-sm">
+            ✉️ Dispatch Activation Link to {{ masked_email }}
+          </button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <div class="alert alert-warning p-3 mb-3 rounded-3" style="font-size: 0.88rem;">
+      ⚠️ <strong>Account Security Notice:</strong> Two-Factor Authentication is mandatory for all ERP accounts. Please link Google Authenticator below to activate access to the system.
+    </div>
+    <div class="my-3">
+      <h6 class="fw-bold">Step 1: Scan this QR Code with Google Authenticator</h6>
+      <p class="text-muted small">Open Google Authenticator (or Microsoft Authenticator) on your phone, tap the <strong>+</strong> button, and scan the QR code below:</p>
+      
+      <div class="text-center my-3 p-3 bg-white border rounded-3 shadow-sm" style="display: inline-block; width: 100%;">
+        <img src="{{ qr_data_uri }}" alt="2FA QR Code" style="width: 220px; height: 220px; display: block; margin: 0 auto;">
+      </div>
+
+      <div class="admin-card p-3 text-center rounded-3 mb-4">
+        <span class="text-muted small">Can't scan? Enter this key manually in the app:</span><br>
+        <code class="d-inline-block mt-1 font-monospace fw-bold" style="font-size: 1.15rem; letter-spacing: 2px; color: #0284c7;">{{ secret }}</code>
+      </div>
+
+      <h6 class="fw-bold mt-4">Step 2: Enter the 6-Digit Code to Confirm</h6>
+      <p class="text-muted small">Enter the code currently displayed in Google Authenticator to activate 2FA:</p>
+      
+      <form action="/user/2fa/setup/" method="POST">
+        {{ csrf_input }}
+        <input type="hidden" name="action" value="enable">
+        <input type="hidden" name="secret" value="{{ secret }}">
+        <div class="input-group mb-3">
+          <input type="text" name="otp_code" class="form-control form-control-lg text-center" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="000000" style="font-weight: 700; letter-spacing: 6px; font-family: monospace; font-size: 1.5rem;" required autofocus>
+          <button class="btn btn-primary btn-lg fw-semibold px-4" type="submit">Activate 2FA</button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if user.is_superuser %}
+    <div class="admin-card p-4 mt-4 shadow-sm" style="border: 1px solid rgba(13, 110, 253, 0.3) !important;">
+      <div class="d-flex align-items-center mb-3">
+        <div class="p-2 rounded-3 me-3" style="background: rgba(13, 110, 253, 0.12); font-size: 1.5rem; line-height: 1;">⚡</div>
+        <div>
+          <h5 class="mb-1 fw-bold text-primary">Superuser Remote 2FA Provisioning</h5>
+          <small class="text-muted">Force-activate 2FA for remote staff/dealers (bypasses IP check & email) and generate WhatsApp key.</small>
+        </div>
+      </div>
+
+      {% if admin_error %}
+      <div class="alert alert-danger py-2 small rounded-3">{{ admin_error }}</div>
+      {% endif %}
+
+      {% if admin_provision_result %}
+      <div class="p-3 mb-3 border rounded-3" style="background: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.3) !important;">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h6 class="text-success fw-bold mb-0">✅ 2FA Activated for {{ admin_provision_result.email }}</h6>
+          <span class="badge bg-success">Status: Active</span>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label text-muted small mb-1 fw-bold">Secret Key (Base32):</label>
+          <div class="input-group">
+            <input type="text" id="waSecretKey" class="form-control font-monospace fw-bold" value="{{ admin_provision_result.secret }}" readonly>
+            <button class="btn btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText('{{ admin_provision_result.secret }}'); this.innerText='Copied!';">Copy Key</button>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label text-muted small mb-1 fw-bold">Formatted WhatsApp Message:</label>
+          <textarea id="waMsgText" class="form-control font-monospace small" rows="5" readonly>{{ admin_provision_result.whatsapp_message }}</textarea>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button class="btn btn-secondary btn-sm" type="button" onclick="navigator.clipboard.writeText(document.getElementById('waMsgText').value); this.innerText='Message Copied!';">📋 Copy WhatsApp Message</button>
+          <a href="{{ admin_provision_result.whatsapp_url }}" target="_blank" class="btn btn-success btn-sm fw-bold">📱 Open in WhatsApp</a>
+        </div>
+      </div>
+      {% endif %}
+
+      <form action="/user/2fa/setup/" method="POST">
+        {{ csrf_input }}
+        <input type="hidden" name="action" value="admin_force_activate">
+        <div class="row g-2 mb-3">
+          <div class="col-md-7">
+            <label class="form-label small fw-bold mb-1">User Email <span class="text-danger">*</span></label>
+            <input type="email" name="target_email" class="form-control" placeholder="user@domain.com" required value="{% if admin_provision_result %}{{ admin_provision_result.email }}{% endif %}">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label small fw-bold mb-1">WhatsApp Mobile (Optional)</label>
+            <input type="text" name="target_mobile" class="form-control" placeholder="9876543210" value="{% if admin_provision_result and admin_provision_result.mobile %}{{ admin_provision_result.mobile }}{% endif %}">
+          </div>
+        </div>
+        <button class="btn btn-primary w-100 fw-bold py-2 shadow-sm rounded-3" type="submit">
+          ⚡ Force-Activate & Generate WhatsApp Key
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
+    <div class="mt-4 text-center">
+      <a href="/" class="btn-back small fw-medium">
+        &larr; Back to Dashboard
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,15 @@
+<div class="input-group input-group-sm mt-1 mb-1">
+  {% set cur_dir = '-' if order_by and order_by.startswith('-') else '' %}
+  {% set cur_col = order_by[1:] if order_by and order_by.startswith('-') else (order_by or '') %}
+  <button type="button" class="btn btn-sm btn-primary my-0 py-0" style="font-size:1rem" data-dir="{{cur_dir}}" id="order_dir"><i
+      class="bi bi-sort-alpha-{{ 'up-alt' if cur_dir == '-' else 'down' }}"></i></button>
+  <select class="form-select form-select-sm me-2" id="order_by">
+    <option value="">------</option>
+    {% for k in mdl_form.data._meta.fields %}
+    {% if not hide or loop.index >= hide %}
+    {% set v = k.name %}
+    <option value="{{v}}" {% if v==cur_col %}selected{% endif %}>{{ v.title() | replace('_', ' ') }}</option>
+    {% endif %}
+    {% endfor %}
+  </select>
+</div>

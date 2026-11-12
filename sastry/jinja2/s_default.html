@@ -1,0 +1,122 @@
+{# s_default.html
+if request.user.id not in [1] and rd_only and k.column in rd_only
+s_cru.html
+if (request.user.id in [1]) or (rd_only and k not in rd_only)
+#}
+{% if restrict %}
+{% set rstr = 'd-none' if request.user.id not in restrict else None %}
+<input type="hidden" id="restrict" value="{{ restrict }}">
+{% else %}
+{% set rstr = ''%}
+{% endif %}
+<div class="d-flex justify-content-between m-1">
+  <div class="col-auto mt-1">
+    <button type="button" class="btn btn-sm btn-outline-primary" id="setIndex" data-bs-toggle="tooltip"
+      data-bs-placement="left" data-bs-pl="" title="Index"><i class="bi bi-list-check"></i></button>
+    <button type="button" class="btn btn-sm btn-outline-success" id="setFilter" data-bs-toggle="tooltip"
+      data-bs-placement="bottom" title="Filter"><i class="bi bi-funnel-fill"></i></button>
+    <button type="button" class="btn btn-sm btn-outline-warning" id="edit" data-bs-toggle="tooltip" title="Edit"
+      data-bs-placement="bottom" disabled><i class="bi bi-pencil-fill"></i></button>
+    <button type="button" class="btn btn-sm btn-outline-danger" id="SaveAll" data-bs-toggle="tooltip" title="SaveAll"
+      data-bs-placement="bottom" disabled><i class="bi bi-cloud-upload-fill"></i></button>
+    <button type="button" class="btn btn-sm btn-outline-success" id="add-record" data-bs-toggle="tooltip"
+      data-bs-placement="bottom" title="New"><i class="bi bi-plus"></i></button>
+    {% if not rstr %}
+    <button type="button" class="btn btn-sm btn-outline-danger" id="del-record" data-bs-toggle="tooltip" title="Delete"
+      data-bs-placement="bottom"><i class="bi bi-trash-fill"></i></button>
+    {% endif %}
+    <button type="button" class="btn btn-sm btn-outline-primary" id="download" data-bs-toggle="tooltip"
+      data-bs-placement="bottom" title="Download"><i class="bi bi-cloud-download"></i></button>
+  </div>
+  <div class="col-auto">
+    {% include 's_pagination.html' %}
+  </div>
+  <div class="col-auto"></div>
+  <div class="col-auto">
+    {% include 'sort_order.html' %}
+  </div>
+  <div class="col-auto {{rstr}}">
+    <button class="btn btn-sm btn-primary mt-1" type="button" data-bs-toggle="offcanvas"
+      data-bs-target="#offcanvasRight" aria-controls="offcanvasRight"><i class="bi bi-eye-slash-fill"></i>
+      Columns</button>
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasRight" aria-labelledby="offcanvasRightLabel">
+      <div class="offcanvas-header">
+        <h5 id="offcanvasRightLabel">Hide All Columns <input type="checkbox" id="hide-all"></h5>
+        <button type="button" class="btn btn-outline-success" id="apply_hide"><i
+            class="bi bi-arrow-return-left"></i>Apply</button>
+        <button type="button" class="btn-close btn-danger text-reset" data-bs-dismiss="offcanvas"></button>
+      </div>
+      <div class="offcanvas-body" id="HideColumns"></div>
+    </div>
+  </div>
+  <div class="col-auto mt-1">
+    <button type="button" class="btn btn-sm btn-info" id="com-exp" data-bs-toggle="tooltip" title="Full Width"><i
+        class="bi bi-arrows-fullscreen"></i></button>
+    <button type="button" class="btn btn-sm btn-dark d-none" id="ShowExtraDetail">List of Items</button>
+  </div>
+</div>
+<div class="collapse show" id="index" style="max-height: 85vh; overflow: auto">
+  <div id="spinner"></div>
+  {% if not tbl_cls %}
+  {% set tbl_cls = 'tableFixHead' %}
+  {% endif %}
+  <table id="index-table" class="table table-bordered table-sm {{tbl_cls}} text-center"
+    style="font-size: 1.0rem; max-height: 85vh; overflow: auto">
+    <thead>
+      <tr class="bg-dark text-white">
+        <th class="text-center" data-col="chk, chk, chk"><input type="checkbox" style="width:2rem; height:1rem" />
+        </th>
+        {% if rel_form %}
+        {% for k in rel_form.data._meta.fields %}
+        {% set dis = k.name in rel_form.fields or k.column in rel_form.fields %}
+        {% if request.user.id not in [1] and rd_only and k.column in rd_only %}
+        {% set dis = 'false' %}
+        {% endif %}
+        <th class="text-center{% if show and k.column not in show%} d-none{% endif %}"
+          data-col="{{k.column}},{{k.__class__.__name__}},{{dis}}">
+          {{ k.name.title() | replace('_', ' ') }}</th>
+        {% endfor %}
+        {% endif %}
+        {% for k in mdl_form.data._meta.fields %}
+        {% set dis = k.name in mdl_form.fields or k.column in mdl_form.fields %}
+        {% if request.user.id not in [1] and rd_only and k.column in rd_only %}
+        {% set dis = 'false' %}
+        {% endif %}
+        <th class="text-center{% if show and k.column not in show%} d-none{% endif %}"
+          data-col="{{k.column}},{{k.__class__.__name__}},{{dis}}">
+          {{ k.name.title() | replace('_', ' ') }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody data-rows="{{rows}}">
+    </tbody>
+  </table>
+</div>
+<div class="collapse" id="form-edit">
+  <form action="/sastry/{{a}}/{{m}}/" id="cru_form">
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+    <div class="mx-1" style="max-height:70vh; overflow:auto">
+      {% include 's_cru.html' %}
+    </div>
+  </form>
+  <div class="d-flex justify-content-evenly">
+    <div class="col-auto">
+      <button type="button" class="btn btn-warning btn-sm" id="Close">Close</button>
+    </div>
+    <div class="col-auto" id="ApplyFilter" data-filter="{{filter}}" data-exclude="{{exclude}}">
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="checkbox" id="FilterOR" {% if fq %} checked{% endif %}" value="">
+        <label class="form-check-label" for="iFilterOR">OR</label>
+      </div>
+      <button type="button" class="btn btn-success btn-sm">Apply Filter</button>
+    </div>
+    <div class="col-auto">
+      <button type="button" class="btn btn-success btn-sm" id="Save">Save</button>
+    </div>
+  </div>
+</div>
+<div class="collapse" id="ExtraDetail">
+  {% if ExtraDetail %}
+  {% include ExtraDetail %}
+  {% endif %}
+</div>

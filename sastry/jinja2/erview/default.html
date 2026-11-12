@@ -1,0 +1,86 @@
+{% extends "saz3Nav.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/sastry/css/er_diagram.css">
+<style>
+  /* Ensure full window height under the navbar */
+  main[role="main"].container {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 48px 0 0 0 !important;
+  }
+  #content {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="er-container" id="erDiagramContainer" data-default-app="{{ default_app }}" data-default-model="{{ default_model }}">
+  
+  <!-- Left Sidebar: App & Model Navigator -->
+  <aside class="er-sidebar-left" id="erSidebarLeft">
+    <div class="er-search-box">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text bg-body-tertiary border-end-0"><i class="bi bi-search"></i></span>
+        <input type="text" class="form-control er-search-input border-start-0" id="erSearchInput" placeholder="Filter models..." autocomplete="off">
+      </div>
+    </div>
+    <ul class="er-model-list">
+      {% for app_name, model_list in madmin.items() %}
+      <li class="er-app-group" data-app="{{ app_name }}">
+        <div class="er-app-group-title">
+          <i class="bi bi-folder2-open me-1 text-primary"></i> {{ app_name }}
+        </div>
+        <ul class="list-unstyled mb-2">
+          {% for mdl_name in model_list %}
+          <li class="er-model-item {% if app_name == default_app and mdl_name == default_model %}active{% endif %}"
+              data-app="{{ app_name }}"
+              data-model="{{ mdl_name }}"
+              title="{{ app_name }}.{{ mdl_name }}">
+            <span class="text-truncate">
+              <i class="bi bi-table me-2 text-secondary"></i>{{ mdl_name }}
+            </span>
+            <i class="bi bi-chevron-right small text-muted" style="font-size:0.7rem"></i>
+          </li>
+          {% endfor %}
+        </ul>
+      </li>
+      {% endfor %}
+    </ul>
+  </aside>
+
+  <!-- Center: Interactive Diagram Viewport -->
+  <main class="er-viewport" id="erViewport">
+    <canvas class="er-canvas-layer" id="erCanvas"></canvas>
+    <div class="er-nodes-layer" id="erNodesLayer">
+      <!-- Table cards and relational connectors injected dynamically by er_diagram.js -->
+    </div>
+  </main>
+
+  <!-- Right Sidebar: Field Inspector -->
+  <aside class="er-sidebar-right" id="erSidebarRight">
+    <div class="er-inspector-header">
+      <div class="d-flex align-items-center text-truncate">
+        <i class="bi bi-sliders2 me-2 text-primary"></i>
+        <span class="text-truncate" id="erCurrentModelTitle">{{ default_app }}.{{ default_model }}</span>
+      </div>
+      <div class="er-toolbar-actions">
+        <button type="button" class="er-btn-round" title="Center Diagram" onclick="if(window.sastryER) window.sastryER.redraw();">
+          <i class="bi bi-arrows-fullscreen"></i>
+        </button>
+      </div>
+    </div>
+    <div class="er-inspector-body" id="erInspectorBody">
+      <div class="text-muted small">Select any field row to inspect its attributes, relationships, and constraints.</div>
+    </div>
+  </aside>
+
+</div>
+{% endblock %}
+
+{% block footer %}
+<script src="/static/sastry/js/er_diagram.js"></script>
+{% endblock %}

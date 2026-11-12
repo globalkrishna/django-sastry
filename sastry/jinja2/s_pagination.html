@@ -1,0 +1,16 @@
+<div class="input-group input-group-sm mt-1">
+    <span class="input-group-text"><span class="badge bg-danger" id="sel-rows"></span></span>
+    <span class="input-group-text" id="n_rows">{{n_rows}} Row{% if n_rows > 1 %}s{% endif%}</span>
+    <input id="rows_pp" type="number" class="form-control text-center px-0" min="10" max="500" step="10"
+        value="{{rows_pp}}">
+    <span class="input-group-text">Rows/Page</span>
+    <button type="button" data-mod="10" class="btn btn-outline-secondary px-1 py-0 {% if n_pages < (page_num + 10) %}d-none{% endif %}" id="rows_pp_p2"><i
+            class="bi bi-chevron-double-up"></i></button>
+    <button type="button" data-mod="-10" class="btn btn-outline-secondary px-0 py-0 {% if page_num < 10 %}d-none{% endif %}" id="rows_pp_m2"><i
+            class="bi bi-chevron-double-down"></i></button>
+    <input id="PageNum" type="number" class="form-control text-center px-0" min="1" value="{{page_num}}"
+        max="{{n_pages}}" data-nrows="{{n_rows}}">
+    <span class="input-group-text" id="n_pages">of {{n_pages}}</span>
+    <button class="btn btn-outline-secondary px-1" type="button" id="set_rows_pp" data-bs-toggle="tooltip"
+        data-bs-placement="bottom" title="Sets Rows/Page and Page #"><i class="bi bi-arrow-return-left"></i></button>
+</div>

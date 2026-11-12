@@ -1,0 +1,104 @@
+{% for k, v in mdl.fields.items() %}
+{% if not hide or loop.index >= hide %}
+{#% if (request.user.id in [1]) or (rd_only and k not in rd_only) %#}
+{% set typ = v.widget.input_type %}
+{% set cname = v.__class__.__name__ %}
+{% if 'BooleanField' in cname %}
+<div class="input-group">
+  <div class="form-check form-check-inline mt-2 ms-2">
+    <input type="checkbox" class="d-none" name="{{k}}" value="False" checked>
+    <input type="checkbox" class="form-check-input" name="{{k}}" id="{{k}}" value="True" {% if mdl.data[k]%} checked{%
+      endif%}>
+    <label class="form-check-label" for="{{k}}">{{v.label}}</label>
+  </div>
+</div>
+{% elif typ =='file' and cname == 'ImageField' %}
+{% set im = mdl.data[k] if mdl.data[k] else 'dummy.jpg' %}
+<div class="card text-center border-primary mt-2">
+  <div class="card-body">
+    <img class="rounded mx-auto d-block" src="/media/{{im}}" data-imgid="{{k}}"
+      style="width:auto; max-width:90%; height:15rem" alt="Card image">
+    {% if mdl.data[k] %}
+    Size:<b>{{(mdl.data[k].size/1024) |round(0,'ceil') | int}} K</b> | Height:{{mdl.data[k].height}} |
+    Width:{{mdl.data[k].width}}
+    {% endif %}
+  </div>
+  <div class="input-group mt-2">
+    <input type="file" class="form-control" readonly accept="image/png, image/jpeg" id="{{k}}" name="{{k}}" value="" />
+    <label class="input-group-text" for="{{k}}">Replace Image:{{im}}</label>
+  </div>
+</div>
+{% else %}
+<div class="input-group mt-2 w-100">
+  <span class="input-group-text" style="min-width:10vw">{{v.label}}</span>
+  {% if not typ %}
+  <textarea class="form-control" id="{{k}}" name="{{k}}" {% if v.required%} required
+    {%endif%}>{% if mdl.data[k] %}{{ mdl.data[k] }}{% endif %}</textarea>
+  {% elif typ == 'select' %}
+  {% set kid = k+'_id' if v.__class__.__name__ =='ModelChoiceField' else k %}
+  {# FK needed in name to put back id instead of name value of foreign key #}
+  <input list="FK{{kid}}" class="form-control" id="{{kid}}" name="FK{{kid}}" autocomplete="off"
+    value="{{mdl.data[k] if v.__class__.__name__ != 'ModelMultipleChoiceField' and mdl.data[k] else ''}}"
+    data-cls={{v.__class__.__name__}} />
+  <datalist id="FK{{kid}}">
+    {% for vl in v.choices | sort(attribute=1) %}
+    <option value="{{vl[1]}}" data-pk="{{vl[0]}}">
+      {% endfor %}
+  </datalist>
+  {% elif 'color' in k and typ != 'number' and not k.endswith('_qty') and not k.startswith('n_colors') and (mdl.data[k] is string or not mdl.data[k]) %}
+  {% set clr = '' %}
+  {% if not mdl.data[k] %}
+  {% set clr = '#000000' %}
+  {% elif mdl.data[k] is string and mdl.data[k].startswith('#') %}
+  {% set clr = mdl.data[k] %}
+  {% elif mdl.data[k] is string and mdl.data[k].startswith('rgb') %}
+  {% set clr=['#']%}
+  {% set spl = mdl.data[k][4:-1].split(',') %}
+  {% for v in spl %}
+  {% set c = clr.append('%02x' % (v|int)) %}
+  {% endfor %}
+  {% set clr = clr|join('') %}
+  {% endif %}
+  {% if clr %}
+  <input type="color" class="form-control" id="{{k}}" name="{{k}}" {% if v.required%} required {%endif%} value="{{clr}}"
+    style="height:inherit;" />
+  <button class="btn btn-outline-primary" type="button" id="clr-img">Change to Image</button>
+  {% else %}
+  <input type="text" class="form-control" value="{{mdl.data[k]}}" id="{{k}}" name="{{k}}" {% if v.required%} required
+    {%endif%} style="height:inherit; background-image:url('/media/{{mdl.data[k]}}'); color:'{{mdl.data.contrast}}'" />
+  <button class="btn btn-outline-primary" type="button" id="clr-img">Change to Color</button>
+  {% endif%}
+  {% else %}
+  {% if 'date.html' in v.widget.template_name %}
+  {% set typ = 'date' %}
+  {% elif 'datetime.html' in v.widget.template_name %}
+  {% set typ = 'datetime-local' %}
+  {% endif %}
+  {% set fval = '' %}
+  {% if mdl.data[k] %}
+    {% if typ == 'datetime-local' %}
+      {% if mdl.data[k].strftime is defined %}
+        {% set fval = mdl.data[k].strftime('%Y-%m-%dT%H:%M:%S') %}
+      {% else %}
+        {% set fval = (mdl.data[k]|string).replace(' ', 'T')[:19] %}
+      {% endif %}
+    {% elif typ == 'date' %}
+      {% if mdl.data[k].strftime is defined %}
+        {% set fval = mdl.data[k].strftime('%Y-%m-%d') %}
+      {% else %}
+        {% set fval = (mdl.data[k]|string)[:10] %}
+      {% endif %}
+    {% else %}
+      {% set fval = mdl.data[k] %}
+    {% endif %}
+  {% endif %}
+  <input type="{{typ}}" class="form-control" id="{{k}}" name="{{k}}" {% if typ=='number' and v.max_digits %}
+    max="1{% for k in range(v.max_digits-v.decimal_places) %}0{%endfor%}" min="0" {% endif%} {% if v.required%} required
+    {%endif%} value="{{fval}}" {% for ak, av in v.widget.attrs.items() %}
+    {{ak}}="{{av}}" {% endfor %} />
+  {% endif %}
+</div>
+{#% endif %#}
+{% endif %}
+{% endif %}
+{% endfor %}

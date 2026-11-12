@@ -1,0 +1,8 @@
+include LICENSE
+include README.md
+include pyproject.toml
+recursive-include sastry/static *
+recursive-include sastry/jinja2 *
+recursive-include sastry/templates *
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]

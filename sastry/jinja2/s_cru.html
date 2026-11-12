@@ -1,0 +1,15 @@
+{# s_default.html
+if request.user.id not in [1] and rd_only and k.column in rd_only
+s_cru.html
+if (request.user.id in [1]) or (rd_only and k not in rd_only)
+#}
+{% if rel_form %}
+<div class="d-none">
+  {% set mdl = rel_form %}
+  <input type="hidden" id="related" value="{{ related }}">
+  {% include 'base_cru.html'%}
+</div>
+{% endif %}
+{% set mdl = mdl_form %}
+<input type="hidden" id="id" name="id" value="{% if mdl_form.data.id %}{{ mdl_form.data.id }}{% endif %}" />
+{% include 'base_cru.html'%}

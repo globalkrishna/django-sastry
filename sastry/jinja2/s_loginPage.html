@@ -1,0 +1,16 @@
+{% extends "saz3.html" %}
+{% block content %}
+<div class="container">
+  <form class="form-signin" action= "/signin/" method="POST">
+    {{ csrf_input }}
+    <h3>{{ menu }}</h3>
+    <label for="username">Email address</label>
+    <input type="email" class="form-control" placeholder="Your Email ID" required autofocus id="email"  name="email" value="">
+    <label for="password">Password</label>
+    <input type="password" class="form-control" placeholder="Password" required id="password" name="password">
+    <input type="hidden" name="next" value="{{next}}" />
+    <button class="btn btn-lg btn-primary btn-block" type="submit">Sign in</button>
+  </form>
+</div>
+{% endblock %}
+	
