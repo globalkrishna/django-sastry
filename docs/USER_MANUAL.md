@@ -32,10 +32,29 @@
 
 ## 1. Architecture & Philosophy
 
+### The 90/10 Architecture of Database Applications
+
+> *"Most database applications center around selecting some filtered rows, and selecting one of them to view details in a custom way."*
+
+In software engineering, this is known as the **Master-Detail** (or *Search-Filter-Browse-Inspect*) pattern. Across enterprise ERPs, CRMs, inventory managers, and billing systems, over 80–90% of user interactions follow this universal two-phase flow:
+
+1. **Phase 1: Filtered Set Reduction**: Search, filter by criteria (e.g. status, customer type, date), sort, and browse paginated tabular records.
+2. **Phase 2: Custom Entity Presentation**: Select a single row to inspect its rich, domain-specific details (an order invoice, a production card, a custom canvas designer, or a dispatch timeline).
+
+In traditional development, engineering teams spend **80% to 90% of their time writing repetitive plumbing** for Phase 1 on every new business module: crafting SQL querysets, serializers, pagination widgets, multi-column search, filter drawers, form builders, and table templates.
+
+**`django-sastry` inverts this equation:**
+- **The 90% (Handled Out-of-the-Box)**: Sastry completely automates Phase 1. It provides dynamic relational data grids, instant search, multi-field filtering, pagination, inline modal editing, and visual ER schema exploration with zero configuration.
+- **The 10% (Your Custom View)**: You only write the domain-specific detail presentation for Phase 2. By plugging your custom view into Sastry's extension hooks (`getData` / `s_crud.js`), you produce a complete, robust, enterprise-grade application in hours instead of weeks.
+
+---
+
+### Core Roles in Modern Django Engineering
+
 `django-sastry` serves two complementary roles in modern Django software engineering:
 
 1. **Zero-Configuration Dynamic Admin & Schema Inspector**:
-   Unlike Django's default `django.contrib.admin`—which requires manually registering `admin.ModelAdmin` classes across every app—Sastry dynamically introspects `apps.get_models()` and model `_meta` APIs in memory with zero boilerplate and zero database overhead.
+   Unlike Django's default `django.contrib.admin`—which requires manually registering `admin.ModelAdmin` classes across every app—Sastry dynamically introspects `apps.get_models()` and model `_meta` APIs in memory with zero boilerplate and zero database overhead during schema generation.
 
 2. **Extensible ERP Application Foundation**:
    In complex enterprise systems (such as `erp.saas3.in`), Sastry acts as the unified base application shell:

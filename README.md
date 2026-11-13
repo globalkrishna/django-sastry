@@ -38,6 +38,77 @@ A lightweight, zero-configuration dynamic CRUD administration interface and inte
 
 ---
 
+## The Core Philosophy: The 90/10 Architecture of Database Applications
+
+> *"Most database applications center around selecting some filtered rows, and selecting one of them to view details in a custom way."*
+
+In traditional enterprise software development, building any new module (such as Customer Management, Job Cards, or Fabric Inventory) requires writing substantial boilerplate: API endpoints, pagination, multi-column search, filter drawers, sorting SQL, table HTML, form builders, and relational bindings. This mundane plumbing consumes **80% to 90%** of development time.
+
+**`django-sastry` solves this by inverting the pyramid:**
+- **The 90% (Out-of-the-Box)**: Sastry automatically provides the high-performance relational data grid, instant dynamic search, multi-field filtering, pagination, inline modal editing, and visual ER schema diagram.
+- **The 10% (Your Custom View)**: You only write the domain-specific detail view (an itemized order dossier, a bespoke canvas designer, or a retail invoice).
+
+### The Pattern in Action: A Complete Application in ~40 Lines
+
+#### 1. Backend: Thin View with `getData` (`views.py`)
+```python
+@login_required
+def CustomersList(request, ctyp=0):
+    dat = json.loads(request.GET.get("dat", "{}"))
+    types = CustomerType.objects.all().order_by("name").values_list("id", "name")
+    if not ctyp and types:
+        ctyp = types[0][0]
+    if "filter" not in dat:
+        dat["filter"] = {"customer_type_id": ctyp}
+    dat["show"] = ["id", "customer_id", "name", "city", "state_id"]
+    
+    # Sastry handles the complete query, pagination, sorting, and serialization:
+    data = getData("customer", "Customer", dat)
+    data["ctype"] = types
+    return render(request, "CustomerPage.html", data)
+```
+
+#### 2. Frontend: Subclassing `db_crud` (`customer.ts`)
+```typescript
+import { db_crud } from '/static/sastry/js/s_crud.js';
+
+class CustomerListController extends db_crud<Customer> {
+    constructor() {
+        super();
+        this.setData();
+        // Hook custom filter buttons (e.g. Retail, Wholesale, Distributor)
+        document.querySelectorAll('#FilterType a').forEach(el => {
+            el.onclick = (e) => this.filterByType(e);
+        });
+        // Enable Sastry's built-in toolbar action button for drill-down
+        const extraBtn = document.getElementById("ShowExtraDetail");
+        extraBtn.textContent = "Orders";
+        extraBtn.classList.remove('d-none');
+    }
+
+    ShowTab(tab: string) {
+        super.ShowTab(tab);
+        if (tab !== 'ExtraDetail') return;
+
+        // Retrieve selected row from Sastry's active table
+        const indexRow = document.querySelector('#index tbody tr.table-active') as HTMLTableRowElement;
+        const customer = this.collection[indexRow.rowIndex - 1];
+
+        // Fetch and display the custom detail view for this customer:
+        fetch(`/customer/cust_order/${customer.id}/`)
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('ExtraDetail')!.innerHTML = html;
+                document.querySelector("#ExtraDetail #Bak2index")!.onclick = () => this.ShowTab('index');
+            });
+    }
+}
+```
+
+By simply writing the custom detail view and connecting it via Sastry's extension points, you achieve a **production-ready, enterprise-grade application** in a few hours.
+
+---
+
 ## Documentation & User Manual
 
 For an in-depth walkthrough of the system, including visual diagrams, color specifications, and step-by-step guides for extending Sastry into a custom ERP application, see the official manual:
