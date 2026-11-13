@@ -10,14 +10,13 @@ readme = "README.md"
 authors = [
     { name = "Krishnamurthy", email = "krishna@globalmultimedia.in" }
 ]
-license = { text = "MIT" }
+license = "MIT"
 classifiers = [
     "Framework :: Django",
     "Framework :: Django :: 4.2",
     "Framework :: Django :: 5.0",
     "Framework :: Django :: 5.1",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
