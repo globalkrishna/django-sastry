@@ -55,7 +55,9 @@
   <!-- Center: Interactive Diagram Viewport -->
   <main class="er-viewport" id="erViewport">
     <div class="er-stage" id="erStage">
-      <canvas class="er-canvas-layer" id="erCanvas"></canvas>
+      <svg class="er-svg-layer" id="erSvg" xmlns="http://www.w3.org/2000/svg">
+        <g id="erConnectionsGroup"></g>
+      </svg>
       <div class="er-nodes-layer" id="erNodesLayer">
         <!-- Table cards and relational connectors injected dynamically by er_diagram.js -->
       </div>

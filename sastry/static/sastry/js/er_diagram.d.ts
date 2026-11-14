@@ -41,6 +41,7 @@ interface ERDiagramPayload {
 interface ERDiagramOptions {
     containerSelector?: string;
     viewportSelector?: string;
+    svgSelector?: string;
     canvasSelector?: string;
     nodesSelector?: string;
     sidebarLeftSelector?: string;
@@ -62,7 +63,8 @@ declare class SastryERDiagram {
     private container;
     private viewport;
     private stage;
-    private canvas;
+    private svgLayer;
+    private svgGroup;
     private nodesLayer;
     private sidebarLeft;
     private inspectorBody;
@@ -99,11 +101,10 @@ declare class SastryERDiagram {
     render(): void;
     private createTableCard;
     private layoutNodes;
-    private resizeCanvas;
+    private resizeSvg;
     drawConnections(): void;
+    private renderSvgConnection;
     private getCardConnectionPoints;
-    private drawArrowhead;
-    private drawSpline;
     private getRowAnchor;
     private getRelativeRect;
     selectField(fieldName: string): void;

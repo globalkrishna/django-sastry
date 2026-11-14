@@ -47,6 +47,7 @@ interface ERDiagramPayload {
 interface ERDiagramOptions {
   containerSelector?: string;
   viewportSelector?: string;
+  svgSelector?: string;
   canvasSelector?: string;
   nodesSelector?: string;
   sidebarLeftSelector?: string;
@@ -71,7 +72,8 @@ class SastryERDiagram {
   private container: HTMLElement | null;
   private viewport: HTMLElement | null;
   private stage: HTMLElement | null;
-  private canvas: HTMLCanvasElement | null;
+  private svgLayer: SVGSVGElement | null;
+  private svgGroup: SVGGElement | null;
   private nodesLayer: HTMLElement | null;
   private sidebarLeft: HTMLElement | null;
   private inspectorBody: HTMLElement | null;
@@ -128,7 +130,8 @@ class SastryERDiagram {
     this.container = document.querySelector(options.containerSelector || '#erDiagramContainer');
     this.viewport = document.querySelector(options.viewportSelector || '#erViewport');
     this.stage = document.querySelector('#erStage');
-    this.canvas = document.querySelector(options.canvasSelector || '#erCanvas');
+    this.svgLayer = document.querySelector(options.svgSelector || '#erSvg');
+    this.svgGroup = document.querySelector('#erConnectionsGroup');
     this.nodesLayer = document.querySelector(options.nodesSelector || '#erNodesLayer');
     this.sidebarLeft = document.querySelector(options.sidebarLeftSelector || '#erSidebarLeft');
     this.inspectorBody = document.querySelector(options.inspectorBodySelector || '#erInspectorBody');
@@ -649,7 +652,7 @@ class SastryERDiagram {
       const canvasHeight = Math.max(this.viewport.clientHeight, activeTableY + activeCardH + 120);
       this.nodesLayer.style.width = `${canvasWidth}px`;
       this.nodesLayer.style.height = `${canvasHeight}px`;
-      this.resizeCanvas(canvasWidth, canvasHeight);
+      this.resizeSvg(canvasWidth, canvasHeight);
       return;
     }
 
@@ -733,31 +736,22 @@ class SastryERDiagram {
     this.nodesLayer.style.width = `${canvasWidth}px`;
     this.nodesLayer.style.height = `${canvasHeight}px`;
 
-    this.resizeCanvas(canvasWidth, canvasHeight);
+    this.resizeSvg(canvasWidth, canvasHeight);
   }
 
-  private resizeCanvas(width: number, height: number): void {
-    if (!this.canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    this.canvas.width = width * dpr;
-    this.canvas.height = height * dpr;
-    this.canvas.style.width = `${width}px`;
-    this.canvas.style.height = `${height}px`;
-
-    const ctx = this.canvas.getContext('2d');
-    if (ctx) {
-      ctx.scale(dpr, dpr);
-    }
+  private resizeSvg(width: number, height: number): void {
+    if (!this.svgLayer) return;
+    this.svgLayer.setAttribute('width', `${width}`);
+    this.svgLayer.setAttribute('height', `${height}`);
+    this.svgLayer.style.width = `${width}px`;
+    this.svgLayer.style.height = `${height}px`;
   }
 
   public drawConnections(): void {
-    if (!this.currentData || !this.canvas) return;
-    const ctx = this.canvas.getContext('2d');
-    if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1;
+    if (!this.currentData || !this.svgGroup) return;
 
-    // Clear canvas
-    ctx.clearRect(0, 0, this.canvas.width / dpr, this.canvas.height / dpr);
+    // Clear previous SVG connections
+    this.svgGroup.innerHTML = '';
 
     const { lvt, foreign, has_many, main_table } = this.currentData;
     const activeCardId = `er-card-${main_table.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
@@ -773,10 +767,7 @@ class SastryERDiagram {
 
     // 1. Draw Incoming Reverse Relations (has_many) -> Pointing to Active Table PK
     if (activePkRow) {
-      ctx.lineWidth = 1.5;
       const relStrokeColor = '#0891b2'; // Cyan/Teal
-      ctx.strokeStyle = relStrokeColor;
-      ctx.fillStyle = relStrokeColor;
 
       Object.keys(has_many || {}).forEach(relKey => {
         const relData = has_many[relKey];
@@ -792,25 +783,17 @@ class SastryERDiagram {
             const relRow = document.getElementById(`er-row-${relKey.replace(/[^a-zA-Z0-9_-]/g, '_')}-${f}`);
             if (relRow) {
               const pts = this.getCardConnectionPoints(relRow, activePkRow);
-
-              this.drawSpline(
-                ctx,
-                pts.startX,
-                pts.startY,
-                pts.endX,
-                pts.endY,
-                pts.startIsRight,
-                pts.endIsRight,
-                relStrokeColor
-              );
-
-              // Draw Arrowhead at active PK anchor
-              this.drawArrowhead(ctx, pts.endX, pts.endY, pts.endIsRight, relStrokeColor);
-
-              // Draw anchor dot at source row
-              ctx.beginPath();
-              ctx.arc(pts.startX, pts.startY, 3, 0, 2 * Math.PI);
-              ctx.fill();
+              this.renderSvgConnection({
+                sourceRow: relRow,
+                targetRow: activePkRow,
+                sourceTable: relKey,
+                sourceField: f,
+                targetTable: main_table,
+                targetField: pkFieldName || 'id',
+                pts,
+                color: relStrokeColor,
+                isChild: true
+              });
             }
           }
         });
@@ -844,32 +827,126 @@ class SastryERDiagram {
             colorIdx++;
 
             const pts = this.getCardConnectionPoints(fkRow, targetPkRow);
-
-            this.drawSpline(
-              ctx,
-              pts.startX,
-              pts.startY,
-              pts.endX,
-              pts.endY,
-              pts.startIsRight,
-              pts.endIsRight,
-              strokeColor
-            );
-
-            // Draw small circle anchor at target PK
-            ctx.fillStyle = strokeColor;
-            ctx.beginPath();
-            ctx.arc(pts.endX, pts.endY, 4, 0, 2 * Math.PI);
-            ctx.fill();
-
-            // Draw small dot at start FK
-            ctx.beginPath();
-            ctx.arc(pts.startX, pts.startY, 3, 0, 2 * Math.PI);
-            ctx.fill();
+            this.renderSvgConnection({
+              sourceRow: fkRow,
+              targetRow: targetPkRow,
+              sourceTable: main_table,
+              sourceField: fieldName,
+              targetTable: targetKey,
+              targetField: targetPkField,
+              pts,
+              color: strokeColor,
+              isChild: false
+            });
           }
         }
       }
     });
+  }
+
+  private renderSvgConnection(opt: {
+    sourceRow: HTMLElement;
+    targetRow: HTMLElement;
+    sourceTable: string;
+    sourceField: string;
+    targetTable: string;
+    targetField: string;
+    pts: {
+      startX: number;
+      startY: number;
+      endX: number;
+      endY: number;
+      startIsRight: boolean;
+      endIsRight: boolean;
+    };
+    color: string;
+    isChild: boolean;
+  }): void {
+    if (!this.svgGroup) return;
+
+    const { startX, startY, endX, endY, startIsRight, endIsRight } = opt.pts;
+    const curvature = Math.min(140, Math.max(35, Math.abs(endX - startX) * 0.4 + Math.abs(endY - startY) * 0.15));
+    const cp1X = startIsRight ? startX + curvature : startX - curvature;
+    const cp1Y = startY;
+    const cp2X = endIsRight ? endX + curvature : endX - curvature;
+    const cp2Y = endY;
+
+    const pathData = `M ${startX} ${startY} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${endX} ${endY}`;
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', 'er-relation-group');
+    g.dataset.source = `${opt.sourceTable}.${opt.sourceField}`;
+    g.dataset.target = `${opt.targetTable}.${opt.targetField}`;
+
+    // 1. Invisible wide hit path for effortless hover detection
+    const hitPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    hitPath.setAttribute('d', pathData);
+    hitPath.setAttribute('class', 'er-spline-hit');
+
+    // 2. Visible crisp vector spline
+    const visiblePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    visiblePath.setAttribute('d', pathData);
+    visiblePath.setAttribute('class', 'er-spline');
+    visiblePath.setAttribute('stroke', opt.color);
+    visiblePath.setAttribute('stroke-width', '1.8');
+
+    // 3. Anchor dot at source row
+    const startDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    startDot.setAttribute('cx', `${startX}`);
+    startDot.setAttribute('cy', `${startY}`);
+    startDot.setAttribute('r', '3');
+    startDot.setAttribute('fill', opt.color);
+    startDot.setAttribute('class', 'er-anchor-dot');
+
+    g.appendChild(hitPath);
+    g.appendChild(visiblePath);
+    g.appendChild(startDot);
+
+    if (opt.isChild) {
+      // Child relation: Arrowhead entering target PK
+      const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      if (endIsRight) {
+        // Enters right edge from the right: arrow points left into (endX, endY)
+        arrow.setAttribute('points', `${endX},${endY} ${endX + 7},${endY - 4} ${endX + 7},${endY + 4}`);
+      } else {
+        // Enters left edge from the left: arrow points right into (endX, endY)
+        arrow.setAttribute('points', `${endX},${endY} ${endX - 7},${endY - 4} ${endX - 7},${endY + 4}`);
+      }
+      arrow.setAttribute('fill', opt.color);
+      g.appendChild(arrow);
+    } else {
+      // Outgoing FK: target anchor circle at target PK
+      const endDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      endDot.setAttribute('cx', `${endX}`);
+      endDot.setAttribute('cy', `${endY}`);
+      endDot.setAttribute('r', '4');
+      endDot.setAttribute('fill', opt.color);
+      endDot.setAttribute('class', 'er-anchor-dot');
+      g.appendChild(endDot);
+    }
+
+    // Tooltip title
+    const titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+    titleEl.textContent = `${opt.sourceTable}.${opt.sourceField} → ${opt.targetTable}.${opt.targetField}`;
+    g.appendChild(titleEl);
+
+    // Interactive hover: glow line and highlight related fields in both table cards
+    g.addEventListener('mouseenter', () => {
+      opt.sourceRow.classList.add('is-relation-active');
+      opt.targetRow.classList.add('is-relation-active');
+    });
+
+    g.addEventListener('mouseleave', () => {
+      opt.sourceRow.classList.remove('is-relation-active');
+      opt.targetRow.classList.remove('is-relation-active');
+    });
+
+    g.addEventListener('click', (e: MouseEvent) => {
+      e.stopPropagation();
+      this.selectField(opt.sourceField);
+    });
+
+    this.svgGroup.appendChild(g);
   }
 
   private getCardConnectionPoints(
@@ -928,54 +1005,6 @@ class SastryERDiagram {
       startIsRight,
       endIsRight
     };
-  }
-
-  private drawArrowhead(
-    ctx: CanvasRenderingContext2D,
-    tipX: number,
-    tipY: number,
-    approachingFromRight: boolean,
-    color: string
-  ): void {
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(tipX, tipY);
-    if (approachingFromRight) {
-      // Arrowhead enters the right edge from the right: tip is at tipX
-      ctx.lineTo(tipX + 7, tipY - 4);
-      ctx.lineTo(tipX + 7, tipY + 4);
-    } else {
-      // Arrowhead enters the left edge from the left: tip is at tipX
-      ctx.lineTo(tipX - 7, tipY - 4);
-      ctx.lineTo(tipX - 7, tipY + 4);
-    }
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  private drawSpline(
-    ctx: CanvasRenderingContext2D,
-    startX: number,
-    startY: number,
-    endX: number,
-    endY: number,
-    startIsRight: boolean,
-    endIsRight: boolean,
-    color: string
-  ): void {
-    ctx.lineWidth = 1.8;
-    ctx.strokeStyle = color;
-
-    const curvature = Math.min(140, Math.max(35, Math.abs(endX - startX) * 0.4 + Math.abs(endY - startY) * 0.15));
-    const cp1X = startIsRight ? startX + curvature : startX - curvature;
-    const cp1Y = startY;
-    const cp2X = endIsRight ? endX + curvature : endX - curvature;
-    const cp2Y = endY;
-
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
-    ctx.stroke();
   }
 
   private getRowAnchor(rowEl: HTMLElement, isRightSide: boolean): { x: number; y: number } {
