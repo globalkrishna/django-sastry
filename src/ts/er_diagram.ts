@@ -332,7 +332,7 @@ class SastryERDiagram {
     const viewW = this.viewport.clientWidth;
     const viewH = this.viewport.clientHeight;
 
-    const padding = 60;
+    const padding = 40;
     const scaleX = (viewW - padding * 2) / contentW;
     const scaleY = (viewH - padding * 2) / contentH;
     this.zoom = Math.min(1.0, Math.max(0.25, Math.min(scaleX, scaleY)));
@@ -621,8 +621,8 @@ class SastryERDiagram {
   private layoutNodes(relatedKeys: string[], mainTableKey: string): void {
     if (!this.viewport || !this.nodesLayer) return;
 
-    const cardSpacingX = 60;
-    const cardSpacingY = 50;
+    const cardSpacingX = 70;
+    const cardSpacingY = 24;
     const colWidth = 280;
     const activeColWidth = 320;
     const startX = 60;
@@ -635,6 +635,7 @@ class SastryERDiagram {
       return card.offsetHeight || (card.getBoundingClientRect().height / (this.zoom || 1)) || 260;
     };
 
+    const activeCardH = getCardHeight(activeCard);
     const totalRelated = relatedKeys.length;
 
     // 0 related tables: center active card comfortably
@@ -645,74 +646,89 @@ class SastryERDiagram {
       activeCard.style.top = `${activeTableY}px`;
 
       const canvasWidth = Math.max(this.viewport.clientWidth, activeTableX + activeColWidth + 120);
-      const canvasHeight = Math.max(this.viewport.clientHeight, activeTableY + getCardHeight(activeCard) + 120);
+      const canvasHeight = Math.max(this.viewport.clientHeight, activeTableY + activeCardH + 120);
       this.nodesLayer.style.width = `${canvasWidth}px`;
       this.nodesLayer.style.height = `${canvasHeight}px`;
       this.resizeCanvas(canvasWidth, canvasHeight);
       return;
     }
 
-    // Determine cards per row: render 4-5 horizontally first, then move down
-    let cardsPerRow = 4;
-    if (totalRelated <= 5) {
-      cardsPerRow = Math.max(1, totalRelated);
-    } else if (totalRelated % 5 === 0) {
-      cardsPerRow = 5;
-    } else {
-      cardsPerRow = 4;
+    // Number of columns: selected table on the right + up to 4 to its left (max 5 columns in row 0)
+    const numCols = Math.min(5, totalRelated + 1);
+    const selectedCol = numCols - 1; // Rightmost column index
+
+    // Precompute X coordinates for each column
+    const colXCoordinates: number[] = [];
+    for (let c = 0; c < numCols; c++) {
+      colXCoordinates.push(startX + c * (colWidth + cardSpacingX));
     }
 
-    const gridWidth = cardsPerRow * colWidth + (cardsPerRow - 1) * cardSpacingX;
+    // Track vertical top position for each column (starting at Y = 50)
+    const colHeights = new Array(numCols).fill(50);
 
-    // Position Selected Active Table prominently at top center of the grid
-    const centerOfGrid = startX + gridWidth / 2;
-    const activeTableX = Math.max(startX, centerOfGrid - activeColWidth / 2);
-    const activeTableY = 50;
-    activeCard.style.left = `${activeTableX}px`;
-    activeCard.style.top = `${activeTableY}px`;
+    // Place Selected Table at Row 0 of the rightmost column
+    activeCard.style.left = `${colXCoordinates[selectedCol]}px`;
+    activeCard.style.top = `50px`;
+    colHeights[selectedCol] += activeCardH + cardSpacingY;
 
-    const activeCardH = getCardHeight(activeCard);
-    const gridStartY = activeTableY + activeCardH + 80;
+    // Precompute heights of all related tables
+    interface RelatedItem {
+      key: string;
+      card: HTMLElement;
+      height: number;
+    }
 
-    // Calculate rows and row heights
-    const numRows = Math.ceil(totalRelated / cardsPerRow);
-    const rowMaxHeights = new Array(numRows).fill(0);
-
-    // Pass 1: compute maximum height per row
-    for (let i = 0; i < totalRelated; i++) {
-      const row = Math.floor(i / cardsPerRow);
-      const card = document.getElementById(`er-card-${relatedKeys[i].replace(/[^a-zA-Z0-9_-]/g, '_')}`);
-      const h = getCardHeight(card);
-      if (h > rowMaxHeights[row]) {
-        rowMaxHeights[row] = h;
+    const allRelatedItems: RelatedItem[] = [];
+    for (const key of relatedKeys) {
+      const card = document.getElementById(`er-card-${key.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
+      if (card) {
+        allRelatedItems.push({
+          key,
+          card,
+          height: getCardHeight(card)
+        });
       }
     }
 
-    // Compute top Y position for each row
-    const rowYPositions = new Array(numRows).fill(0);
-    let runningY = gridStartY;
-    for (let r = 0; r < numRows; r++) {
-      rowYPositions[r] = runningY;
-      runningY += rowMaxHeights[r] + cardSpacingY;
+    // Sort related items by height (descending) so taller cards are placed first
+    // and shorter cards fill the remaining gaps, balancing all column heights uniformly
+    allRelatedItems.sort((a, b) => b.height - a.height);
+
+    // First row: assign 1 card each to columns to the left of the selected table (0..selectedCol - 1)
+    const firstRowCols = selectedCol; // e.g. 4 columns if numCols == 5
+    const firstRowItems = allRelatedItems.slice(0, firstRowCols);
+    const remainingItems = allRelatedItems.slice(firstRowCols);
+
+    for (let c = 0; c < firstRowItems.length; c++) {
+      const it = firstRowItems[c];
+      it.card.style.left = `${colXCoordinates[c]}px`;
+      it.card.style.top = `50px`;
+      colHeights[c] += it.height + cardSpacingY;
     }
 
-    // Pass 2: place related cards horizontally first (4-5 per row), then wrap to next row down
-    for (let i = 0; i < totalRelated; i++) {
-      const col = i % cardsPerRow;
-      const row = Math.floor(i / cardsPerRow);
-      const card = document.getElementById(`er-card-${relatedKeys[i].replace(/[^a-zA-Z0-9_-]/g, '_')}`);
-      if (!card) continue;
+    // Remaining tables (if more than 5 tables total):
+    // Greedily place each into the column with the minimum current height,
+    // stacking directly below without unnecessary blank spaces
+    for (const it of remainingItems) {
+      let bestCol = 0;
+      let minH = colHeights[0];
+      for (let c = 1; c < numCols; c++) {
+        if (colHeights[c] < minH) {
+          minH = colHeights[c];
+          bestCol = c;
+        }
+      }
 
-      const cardX = startX + col * (colWidth + cardSpacingX);
-      const cardY = rowYPositions[row];
-      card.style.left = `${cardX}px`;
-      card.style.top = `${cardY}px`;
+      it.card.style.left = `${colXCoordinates[bestCol]}px`;
+      it.card.style.top = `${colHeights[bestCol]}px`;
+      colHeights[bestCol] += it.height + cardSpacingY;
     }
 
     // Canvas boundary sizing with padding
-    const maxContentX = Math.max(startX + gridWidth, activeTableX + activeColWidth);
+    const maxContentX = colXCoordinates[selectedCol] + activeColWidth;
     const canvasWidth = Math.max(this.viewport.clientWidth, maxContentX + 100);
-    const canvasHeight = Math.max(this.viewport.clientHeight, runningY + 80);
+    const maxColHeight = Math.max(...colHeights);
+    const canvasHeight = Math.max(this.viewport.clientHeight, maxColHeight + 80);
 
     this.nodesLayer.style.width = `${canvasWidth}px`;
     this.nodesLayer.style.height = `${canvasHeight}px`;
