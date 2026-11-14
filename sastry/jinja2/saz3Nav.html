@@ -15,8 +15,7 @@
   <div class="col-auto">
     <input list="AppMdl" class="form-control form-control-sm py-0 my-0 fw-bold" spellcheck="false"
       style="font-size:0.9rem;" id="app-model" value="" placeholder="Search model..." autocomplete="off"
-      onclick="handleModelInputClick(this);"
-      onfocus="handleModelInputClick(this);" />
+      onmousedown="handleModelInputMouseDown(this);" />
     <datalist id="AppMdl" class="fw-bold">
       {% for mk, mv in madmin | dictsort() %}
       {% for v in mv | sort %}
@@ -42,7 +41,7 @@
       document.getElementById('app-model').value = '';
       document.getElementById('sel-app').value = '';
     }
-    function handleModelInputClick(el) {
+    function handleModelInputMouseDown(el) {
       const selApp = document.getElementById('sel-app') ? document.getElementById('sel-app').value : '';
       const prefix = selApp ? selApp + '_' : '';
       if (el.value && el.value !== prefix) {

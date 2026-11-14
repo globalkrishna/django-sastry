@@ -959,15 +959,6 @@ export class AdminerEdit extends db_crud {
             const appModelEl = document.getElementById('app-model') as HTMLInputElement | null;
             if (appModelEl) {
                 appModelEl.onchange = (e: any) => this.loadModel(e);
-                appModelEl.onclick = () => {
-                    const selApp = document.getElementById('sel-app') as HTMLSelectElement | null;
-                    const prefix = (selApp && selApp.value) ? selApp.value + '_' : '';
-                    if (appModelEl.value && appModelEl.value !== prefix) {
-                        appModelEl.value = prefix;
-                    } else if (!appModelEl.value && prefix) {
-                        appModelEl.value = prefix;
-                    }
-                };
             }
 
             const path = window.location.pathname;
