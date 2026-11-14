@@ -24,6 +24,20 @@ class SastryERDiagram {
     isPanning = false;
     startX = 0;
     startY = 0;
+    // Interactive Card Dragging State
+    isDraggingCard = false;
+    draggedCard = null;
+    cardDragStartX = 0;
+    cardDragStartY = 0;
+    cardInitialLeft = 0;
+    cardInitialTop = 0;
+    hasCardMoved = false;
+    justDraggedCard = false;
+    // Touch & Pinch-to-Zoom State
+    touchStartDistance = 0;
+    touchStartZoom = 1;
+    touchCenterX = 0;
+    touchCenterY = 0;
     activeApp;
     activeModel;
     currentData = null;
@@ -105,7 +119,30 @@ class SastryERDiagram {
         }
         // Table clicks inside viewport (clicking any other table selects it and moves it to right)
         if (this.nodesLayer) {
+            // 0. Card dragging via mousedown on table header
+            this.nodesLayer.addEventListener('mousedown', (e) => {
+                if (e.button !== 0)
+                    return;
+                const target = e.target;
+                if (target.closest('.er-fk-badge'))
+                    return; // Allow clicking FK jump badge
+                const header = target.closest('.er-table-header');
+                const card = target.closest('.er-table-card');
+                if (header && card) {
+                    this.isDraggingCard = true;
+                    this.draggedCard = card;
+                    this.cardDragStartX = e.clientX;
+                    this.cardDragStartY = e.clientY;
+                    this.cardInitialLeft = parseFloat(card.style.left) || 0;
+                    this.cardInitialTop = parseFloat(card.style.top) || 0;
+                    this.hasCardMoved = false;
+                    e.stopPropagation();
+                }
+            });
             this.nodesLayer.addEventListener('click', (e) => {
+                if (this.justDraggedCard) {
+                    return;
+                }
                 const target = e.target;
                 const clickedCard = target.closest('.er-table-card');
                 if (!clickedCard)
@@ -176,12 +213,17 @@ class SastryERDiagram {
         }
         // Redraw connections on window resize
         window.addEventListener('resize', () => this.redraw());
-        // Viewport Pan (drag background) and Zoom (mouse wheel)
+        // Viewport Pan (drag background) and Zoom (mouse wheel & touch)
         if (this.viewport) {
             this.viewport.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
             this.viewport.addEventListener('mousedown', (e) => this.onMouseDown(e));
             window.addEventListener('mousemove', (e) => this.onMouseMove(e));
             window.addEventListener('mouseup', () => this.onMouseUp());
+            // Touch events for mobile/tablet pinch & drag
+            this.viewport.addEventListener('touchstart', (e) => this.onTouchStart(e), { passive: false });
+            window.addEventListener('touchmove', (e) => this.onTouchMove(e), { passive: false });
+            window.addEventListener('touchend', () => this.onTouchEnd());
+            window.addEventListener('touchcancel', () => this.onTouchEnd());
         }
         // Floating Zoom Controls
         const btnZoomIn = document.getElementById('erZoomIn');
@@ -196,6 +238,13 @@ class SastryERDiagram {
         const btnZoomFit = document.getElementById('erZoomFit');
         if (btnZoomFit)
             btnZoomFit.addEventListener('click', () => this.zoomFit());
+        // Export Controls
+        const btnExportSvg = document.getElementById('erExportSvg');
+        if (btnExportSvg)
+            btnExportSvg.addEventListener('click', () => this.exportSvg());
+        const btnExportPng = document.getElementById('erExportPng');
+        if (btnExportPng)
+            btnExportPng.addEventListener('click', () => this.exportPng());
     }
     applyTransform() {
         if (this.stage) {
@@ -291,6 +340,45 @@ class SastryERDiagram {
         }
     }
     onMouseMove(e) {
+        if (this.isDraggingCard && this.draggedCard) {
+            const dist = Math.hypot(e.clientX - this.cardDragStartX, e.clientY - this.cardDragStartY);
+            if (!this.hasCardMoved && dist > 4) {
+                this.hasCardMoved = true;
+                this.draggedCard.classList.add('is-dragging');
+            }
+            if (this.hasCardMoved) {
+                const dx = (e.clientX - this.cardDragStartX) / (this.zoom || 1);
+                const dy = (e.clientY - this.cardDragStartY) / (this.zoom || 1);
+                const newLeft = Math.max(10, this.cardInitialLeft + dx);
+                const newTop = Math.max(10, this.cardInitialTop + dy);
+                this.draggedCard.style.left = `${newLeft}px`;
+                this.draggedCard.style.top = `${newTop}px`;
+                if (this.nodesLayer) {
+                    const cardRight = newLeft + this.draggedCard.offsetWidth + 120;
+                    const cardBottom = newTop + this.draggedCard.offsetHeight + 120;
+                    const curW = parseFloat(this.nodesLayer.style.width) || 0;
+                    const curH = parseFloat(this.nodesLayer.style.height) || 0;
+                    let changed = false;
+                    let nextW = curW;
+                    let nextH = curH;
+                    if (cardRight > curW) {
+                        nextW = cardRight;
+                        changed = true;
+                    }
+                    if (cardBottom > curH) {
+                        nextH = cardBottom;
+                        changed = true;
+                    }
+                    if (changed) {
+                        this.nodesLayer.style.width = `${nextW}px`;
+                        this.nodesLayer.style.height = `${nextH}px`;
+                        this.resizeSvg(nextW, nextH);
+                    }
+                }
+                this.drawConnections();
+            }
+            return;
+        }
         if (!this.isPanning)
             return;
         this.panX = e.clientX - this.startX;
@@ -298,12 +386,111 @@ class SastryERDiagram {
         this.applyTransform();
     }
     onMouseUp() {
+        if (this.isDraggingCard) {
+            if (this.hasCardMoved) {
+                this.justDraggedCard = true;
+                setTimeout(() => { this.justDraggedCard = false; }, 80);
+            }
+            if (this.draggedCard) {
+                this.draggedCard.classList.remove('is-dragging');
+            }
+            this.isDraggingCard = false;
+            this.draggedCard = null;
+            this.hasCardMoved = false;
+        }
         if (this.isPanning) {
             this.isPanning = false;
             if (this.viewport) {
                 this.viewport.classList.remove('is-panning');
             }
         }
+    }
+    onTouchStart(e) {
+        if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+            const header = target?.closest('.er-table-header');
+            const card = target?.closest('.er-table-card');
+            if (header && card) {
+                this.isDraggingCard = true;
+                this.draggedCard = card;
+                this.cardDragStartX = touch.clientX;
+                this.cardDragStartY = touch.clientY;
+                this.cardInitialLeft = parseFloat(card.style.left) || 0;
+                this.cardInitialTop = parseFloat(card.style.top) || 0;
+                this.hasCardMoved = false;
+                return;
+            }
+            if (target?.closest('.er-zoom-controls') || target?.closest('.er-table-card')) {
+                return;
+            }
+            this.isPanning = true;
+            this.startX = touch.clientX - this.panX;
+            this.startY = touch.clientY - this.panY;
+            if (this.viewport) {
+                this.viewport.classList.add('is-panning');
+            }
+        }
+        else if (e.touches.length === 2) {
+            this.isPanning = false;
+            this.isDraggingCard = false;
+            if (this.draggedCard) {
+                this.draggedCard.classList.remove('is-dragging');
+                this.draggedCard = null;
+            }
+            const t0 = e.touches[0];
+            const t1 = e.touches[1];
+            this.touchStartDistance = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+            this.touchStartZoom = this.zoom;
+            if (this.viewport) {
+                const rect = this.viewport.getBoundingClientRect();
+                this.touchCenterX = ((t0.clientX + t1.clientX) / 2) - rect.left;
+                this.touchCenterY = ((t0.clientY + t1.clientY) / 2) - rect.top;
+            }
+        }
+    }
+    onTouchMove(e) {
+        if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            if (this.isDraggingCard && this.draggedCard) {
+                e.preventDefault();
+                const dist = Math.hypot(touch.clientX - this.cardDragStartX, touch.clientY - this.cardDragStartY);
+                if (!this.hasCardMoved && dist > 5) {
+                    this.hasCardMoved = true;
+                    this.draggedCard.classList.add('is-dragging');
+                }
+                if (this.hasCardMoved) {
+                    const dx = (touch.clientX - this.cardDragStartX) / (this.zoom || 1);
+                    const dy = (touch.clientY - this.cardDragStartY) / (this.zoom || 1);
+                    this.draggedCard.style.left = `${Math.max(10, this.cardInitialLeft + dx)}px`;
+                    this.draggedCard.style.top = `${Math.max(10, this.cardInitialTop + dy)}px`;
+                    this.drawConnections();
+                }
+                return;
+            }
+            if (this.isPanning) {
+                e.preventDefault();
+                this.panX = touch.clientX - this.startX;
+                this.panY = touch.clientY - this.startY;
+                this.applyTransform();
+            }
+        }
+        else if (e.touches.length === 2 && this.touchStartDistance > 0) {
+            e.preventDefault();
+            const t0 = e.touches[0];
+            const t1 = e.touches[1];
+            const currentDistance = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+            const factor = currentDistance / this.touchStartDistance;
+            const newZoom = Math.min(2.5, Math.max(0.25, this.touchStartZoom * factor));
+            this.panX = this.touchCenterX - ((this.touchCenterX - this.panX) / this.zoom) * newZoom;
+            this.panY = this.touchCenterY - ((this.touchCenterY - this.panY) / this.zoom) * newZoom;
+            this.zoom = newZoom;
+            this.applyTransform();
+        }
+    }
+    onTouchEnd() {
+        this.onMouseUp();
+        this.touchStartDistance = 0;
     }
     filterModelList(query) {
         if (!this.sidebarLeft)
@@ -695,60 +882,66 @@ class SastryERDiagram {
         if (!this.svgGroup)
             return;
         const { startX, startY, endX, endY, startIsRight, endIsRight } = opt.pts;
-        const curvature = Math.min(140, Math.max(35, Math.abs(endX - startX) * 0.4 + Math.abs(endY - startY) * 0.15));
-        const cp1X = startIsRight ? startX + curvature : startX - curvature;
+        const dirS = startIsRight ? 1 : -1;
+        const dirE = endIsRight ? 1 : -1;
+        // Many-side (Crow's Foot): sourceRow is the ForeignKey / Child table side
+        const forkX = startX + 12 * dirS;
+        const ringX = startX + 17 * dirS;
+        const splineStartX = startX + 20 * dirS;
+        // One-side (Double Bar --||--): targetRow is the PrimaryKey / Parent table side
+        const bar1X = endX + 6 * dirE;
+        const bar2X = endX + 11 * dirE;
+        const splineEndX = endX + 11 * dirE;
+        const curvature = Math.min(140, Math.max(35, Math.abs(splineEndX - splineStartX) * 0.4 + Math.abs(endY - startY) * 0.15));
+        const cp1X = startIsRight ? splineStartX + curvature : splineStartX - curvature;
         const cp1Y = startY;
-        const cp2X = endIsRight ? endX + curvature : endX - curvature;
+        const cp2X = endIsRight ? splineEndX + curvature : splineEndX - curvature;
         const cp2Y = endY;
-        const pathData = `M ${startX} ${startY} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${endX} ${endY}`;
+        // Main Bézier spline between the two cardinality markers
+        const pathData = `M ${splineStartX} ${startY} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${splineEndX} ${endY}`;
+        // Full path for hover hit-testing
+        const hitPathData = `M ${startX} ${startY} L ${splineStartX} ${startY} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${splineEndX} ${endY} L ${endX} ${endY}`;
         const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         g.setAttribute('class', 'er-relation-group');
         g.dataset.source = `${opt.sourceTable}.${opt.sourceField}`;
         g.dataset.target = `${opt.targetTable}.${opt.targetField}`;
         // 1. Invisible wide hit path for effortless hover detection
         const hitPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        hitPath.setAttribute('d', pathData);
+        hitPath.setAttribute('d', hitPathData);
         hitPath.setAttribute('class', 'er-spline-hit');
+        g.appendChild(hitPath);
         // 2. Visible crisp vector spline
         const visiblePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         visiblePath.setAttribute('d', pathData);
         visiblePath.setAttribute('class', 'er-spline');
         visiblePath.setAttribute('stroke', opt.color);
         visiblePath.setAttribute('stroke-width', '1.8');
-        // 3. Anchor dot at source row
-        const startDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        startDot.setAttribute('cx', `${startX}`);
-        startDot.setAttribute('cy', `${startY}`);
-        startDot.setAttribute('r', '3');
-        startDot.setAttribute('fill', opt.color);
-        startDot.setAttribute('class', 'er-anchor-dot');
-        g.appendChild(hitPath);
         g.appendChild(visiblePath);
-        g.appendChild(startDot);
-        if (opt.isChild) {
-            // Child relation: Arrowhead entering target PK
-            const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-            if (endIsRight) {
-                // Enters right edge from the right: arrow points left into (endX, endY)
-                arrow.setAttribute('points', `${endX},${endY} ${endX + 7},${endY - 4} ${endX + 7},${endY + 4}`);
-            }
-            else {
-                // Enters left edge from the left: arrow points right into (endX, endY)
-                arrow.setAttribute('points', `${endX},${endY} ${endX - 7},${endY - 4} ${endX - 7},${endY + 4}`);
-            }
-            arrow.setAttribute('fill', opt.color);
-            g.appendChild(arrow);
-        }
-        else {
-            // Outgoing FK: target anchor circle at target PK
-            const endDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-            endDot.setAttribute('cx', `${endX}`);
-            endDot.setAttribute('cy', `${endY}`);
-            endDot.setAttribute('r', '4');
-            endDot.setAttribute('fill', opt.color);
-            endDot.setAttribute('class', 'er-anchor-dot');
-            g.appendChild(endDot);
-        }
+        // 3. Many-Side: Authentic Martin Crow's Foot Fork (3 prongs)
+        const crowsFootPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        const crowsD = `M ${startX} ${startY - 7} L ${forkX} ${startY} L ${startX} ${startY + 7} M ${startX} ${startY} L ${splineStartX} ${startY}`;
+        crowsFootPath.setAttribute('d', crowsD);
+        crowsFootPath.setAttribute('class', 'er-crows-foot');
+        crowsFootPath.setAttribute('stroke', opt.color);
+        crowsFootPath.setAttribute('stroke-width', '1.8');
+        g.appendChild(crowsFootPath);
+        // 4. Many-Side: Optional / Zero Ring (indicating 0..N relationship)
+        const crowsRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        crowsRing.setAttribute('cx', `${ringX}`);
+        crowsRing.setAttribute('cy', `${startY}`);
+        crowsRing.setAttribute('r', '3');
+        crowsRing.setAttribute('class', 'er-crows-ring');
+        crowsRing.setAttribute('stroke', opt.color);
+        crowsRing.setAttribute('fill', 'var(--er-card-bg)');
+        g.appendChild(crowsRing);
+        // 5. One-Side: Double Crossbar (--||--) indicating Mandatory Exactly One (1..1)
+        const oneBarPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        const oneD = `M ${endX} ${endY} L ${splineEndX} ${endY} M ${bar1X} ${endY - 6} L ${bar1X} ${endY + 6} M ${bar2X} ${endY - 6} L ${bar2X} ${endY + 6}`;
+        oneBarPath.setAttribute('d', oneD);
+        oneBarPath.setAttribute('class', 'er-one-bar');
+        oneBarPath.setAttribute('stroke', opt.color);
+        oneBarPath.setAttribute('stroke-width', '1.8');
+        g.appendChild(oneBarPath);
         // Tooltip title
         const titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
         titleEl.textContent = `${opt.sourceTable}.${opt.sourceField} → ${opt.targetTable}.${opt.targetField}`;
@@ -952,6 +1145,139 @@ class SastryERDiagram {
         card.classList.remove('er-card-pulse');
         void card.offsetWidth; // Force DOM reflow
         card.classList.add('er-card-pulse');
+    }
+    generateStandaloneSvg() {
+        if (!this.nodesLayer || !this.svgGroup)
+            return null;
+        const cards = Array.from(this.nodesLayer.querySelectorAll('.er-table-card'));
+        if (cards.length === 0)
+            return null;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        cards.forEach(card => {
+            const left = parseFloat(card.style.left) || 0;
+            const top = parseFloat(card.style.top) || 0;
+            const w = card.offsetWidth || 280;
+            const h = card.offsetHeight || 260;
+            if (left < minX)
+                minX = left;
+            if (top < minY)
+                minY = top;
+            if (left + w > maxX)
+                maxX = left + w;
+            if (top + h > maxY)
+                maxY = top + h;
+        });
+        const pad = 40;
+        const totalW = Math.round(maxX - minX + pad * 2);
+        const totalH = Math.round(maxY - minY + pad * 2);
+        const offsetX = Math.round(-minX + pad);
+        const offsetY = Math.round(-minY + pad);
+        const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark' || document.body.classList.contains('dark-theme');
+        const bg = isDark ? '#0f172a' : '#f8fafc';
+        const cardBg = isDark ? '#1e293b' : '#ffffff';
+        const cardBorder = isDark ? '#334155' : '#cbd5e1';
+        const textColor = isDark ? '#f1f5f9' : '#1e293b';
+        const textMuted = isDark ? '#94a3b8' : '#64748b';
+        const rowBorder = isDark ? '#334155' : '#f1f5f9';
+        const css = `
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      .er-table-card { position: absolute; border-radius: 8px; border: 1px solid ${cardBorder}; background: ${cardBg}; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.15); overflow: hidden; font-family: system-ui, -apple-system, sans-serif; color: ${textColor}; }
+      .er-table-header { padding: 8px 12px; font-weight: 700; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid ${cardBorder}; }
+      .er-table-card.active-table .er-table-header { background: #facc15; color: #1e293b; }
+      .er-table-card.has-many-table .er-table-header { background: #0891b2; color: #ffffff; }
+      .er-table-card.foreign-table .er-table-header { background: #ea580c; color: #ffffff; }
+      .er-table-card.mutual-table .er-table-header { background: linear-gradient(135deg, #0891b2, #ea580c); color: #ffffff; }
+      .er-table-badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 12px; background: rgba(255,255,255,0.25); font-weight: 600; }
+      .er-table-body { margin: 0; padding: 0; }
+      .er-field-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 10px; border-bottom: 1px solid ${rowBorder}; font-size: 0.78rem; font-family: monospace; }
+      .er-field-icon { width: 18px; margin-right: 6px; text-align: center; }
+      .er-field-name { flex: 1; }
+      .er-field-type { font-size: 0.72rem; color: ${textMuted}; font-family: system-ui, sans-serif; }
+      .er-spline { fill: none; }
+      .er-spline-hit { display: none; }
+      .er-crows-foot { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+      .er-crows-ring { fill: ${cardBg}; stroke-width: 1.6; }
+      .er-one-bar { stroke-linecap: round; }
+    `;
+        const connectionsHtml = this.svgGroup.innerHTML;
+        let cardsHtml = '';
+        cards.forEach(card => {
+            const cardX = (parseFloat(card.style.left) || 0) + offsetX;
+            const cardY = (parseFloat(card.style.top) || 0) + offsetY;
+            const cardW = card.offsetWidth || 280;
+            const cardH = card.offsetHeight || 260;
+            const cleanCardHtml = card.outerHTML
+                .replace(/style="[^"]*left:[^"]*"/g, `style="position:relative; width:${cardW}px; height:${cardH}px;"`);
+            cardsHtml += `
+        <foreignObject x="${cardX}" y="${cardY}" width="${cardW}" height="${cardH}">
+          <div xmlns="http://www.w3.org/1999/xhtml">
+            ${cleanCardHtml}
+          </div>
+        </foreignObject>
+      `;
+        });
+        return `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}">
+        <defs>
+          <style type="text/css">
+            ${css}
+          </style>
+        </defs>
+        <rect width="100%" height="100%" fill="${bg}"/>
+        <g transform="translate(${offsetX}, ${offsetY})">
+          ${connectionsHtml}
+        </g>
+        ${cardsHtml}
+      </svg>
+    `.trim();
+    }
+    exportSvg() {
+        const svgContent = this.generateStandaloneSvg();
+        if (!svgContent)
+            return;
+        const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+        this.downloadBlob(blob, `sastry-er-${this.activeApp}-${this.activeModel}.svg`);
+    }
+    exportPng() {
+        const svgContent = this.generateStandaloneSvg();
+        if (!svgContent)
+            return;
+        const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+            const scale = 2; // High-resolution retina 2x
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.scale(scale, scale);
+                ctx.drawImage(img, 0, 0);
+                canvas.toBlob((pngBlob) => {
+                    if (pngBlob) {
+                        this.downloadBlob(pngBlob, `sastry-er-${this.activeApp}-${this.activeModel}.png`);
+                    }
+                }, 'image/png');
+            }
+            URL.revokeObjectURL(url);
+        };
+        img.onerror = () => {
+            // Fallback: download as SVG if browser canvas rasterization fails
+            this.exportSvg();
+            URL.revokeObjectURL(url);
+        };
+        img.src = url;
+    }
+    downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
     }
     redraw() {
         if (this.currentData) {

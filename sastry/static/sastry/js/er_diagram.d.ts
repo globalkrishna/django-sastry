@@ -77,6 +77,18 @@ declare class SastryERDiagram {
     private isPanning;
     private startX;
     private startY;
+    private isDraggingCard;
+    private draggedCard;
+    private cardDragStartX;
+    private cardDragStartY;
+    private cardInitialLeft;
+    private cardInitialTop;
+    private hasCardMoved;
+    private justDraggedCard;
+    private touchStartDistance;
+    private touchStartZoom;
+    private touchCenterX;
+    private touchCenterY;
     activeApp: string;
     activeModel: string;
     currentData: ERDiagramPayload | null;
@@ -96,6 +108,9 @@ declare class SastryERDiagram {
     private onMouseDown;
     private onMouseMove;
     private onMouseUp;
+    private onTouchStart;
+    private onTouchMove;
+    private onTouchEnd;
     filterModelList(query: string): void;
     loadModel(appLabel: string, modelName: string): Promise<void>;
     render(): void;
@@ -111,5 +126,9 @@ declare class SastryERDiagram {
     private renderInspector;
     jumpToModel(fullLabel: string): void;
     highlightAndScrollToNode(tableKey: string): void;
+    generateStandaloneSvg(): string | null;
+    exportSvg(): void;
+    exportPng(): void;
+    private downloadBlob;
     redraw(): void;
 }

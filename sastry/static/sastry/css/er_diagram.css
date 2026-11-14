@@ -183,6 +183,40 @@
   r: 5.5;
 }
 
+/* Martin Crow's Foot & Exact-One Cardinality Markers */
+.er-crows-foot {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+  transition: stroke-width 0.15s ease, filter 0.15s ease;
+}
+
+.er-crows-ring {
+  stroke-width: 1.6;
+  fill: var(--er-card-bg);
+  pointer-events: none;
+  transition: r 0.15s ease, stroke-width 0.15s ease;
+}
+
+.er-one-bar {
+  fill: none;
+  stroke-linecap: round;
+  pointer-events: none;
+  transition: stroke-width 0.15s ease, filter 0.15s ease;
+}
+
+.er-relation-group:hover .er-crows-foot,
+.er-relation-group:hover .er-one-bar {
+  stroke-width: 2.8px !important;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+.er-relation-group:hover .er-crows-ring {
+  stroke-width: 2.2px !important;
+  r: 4;
+}
+
 .er-field-row.is-relation-active {
   background-color: rgba(14, 165, 233, 0.25) !important;
   color: #38bdf8 !important;
@@ -241,6 +275,13 @@
   font-size: 0.75rem;
 }
 
+.er-zoom-divider {
+  width: 1px;
+  height: 18px;
+  background-color: var(--er-border);
+  margin: 0 2px;
+}
+
 /* Table Card Component */
 .er-table-card {
   position: absolute;
@@ -292,11 +333,26 @@
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--er-border);
+  cursor: grab;
+  user-select: none;
+}
+
+.er-table-card.is-dragging {
+  cursor: grabbing !important;
+  z-index: 1000 !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.35), 0 10px 10px -5px rgba(0, 0, 0, 0.25) !important;
+  transition: none !important;
+  opacity: 0.95;
+}
+
+.er-table-card.is-dragging .er-table-header {
+  cursor: grabbing !important;
 }
 
 .er-table-card.active-table .er-table-header {
   background: linear-gradient(135deg, #facc15, #eab308);
   color: #1e293b;
+  cursor: grab;
 }
 
 .er-table-card.active-table .er-table-badge {
@@ -307,19 +363,19 @@
 .er-table-card.has-many-table .er-table-header {
   background: linear-gradient(135deg, #06b6d4, #0891b2);
   color: #ffffff;
-  cursor: pointer;
+  cursor: grab;
 }
 
 .er-table-card.foreign-table .er-table-header {
   background: linear-gradient(135deg, #f97316, #ea580c);
   color: #ffffff;
-  cursor: pointer;
+  cursor: grab;
 }
 
 .er-table-card.mutual-table .er-table-header {
   background: linear-gradient(135deg, #0891b2 0%, #ea580c 100%);
   color: #ffffff;
-  cursor: pointer;
+  cursor: grab;
 }
 
 .er-table-badge {

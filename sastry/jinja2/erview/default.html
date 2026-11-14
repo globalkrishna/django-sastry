@@ -69,6 +69,9 @@
       <button type="button" class="er-zoom-btn" id="erZoomOut" title="Zoom Out (Wheel Down)"><i class="bi bi-zoom-out"></i></button>
       <button type="button" class="er-zoom-btn" id="erZoomReset" title="Reset Zoom (100%)"><span id="erZoomLevel">100%</span></button>
       <button type="button" class="er-zoom-btn" id="erZoomFit" title="Fit All to View"><i class="bi bi-arrows-fullscreen"></i></button>
+      <div class="er-zoom-divider"></div>
+      <button type="button" class="er-zoom-btn" id="erExportSvg" title="Export as Vector SVG"><i class="bi bi-filetype-svg"></i></button>
+      <button type="button" class="er-zoom-btn" id="erExportPng" title="Export as High-Res PNG"><i class="bi bi-filetype-png"></i></button>
     </div>
   </main>
 
@@ -80,6 +83,9 @@
         <span class="text-truncate" id="erCurrentModelTitle">{{ default_app }}.{{ default_model }}</span>
       </div>
       <div class="er-toolbar-actions">
+        <button type="button" class="er-btn-round" title="Export as High-Res PNG" onclick="if(window.sastryER) window.sastryER.exportPng();">
+          <i class="bi bi-camera"></i>
+        </button>
         <button type="button" class="er-btn-round" title="Center Diagram" onclick="if(window.sastryER) window.sastryER.redraw();">
           <i class="bi bi-arrows-fullscreen"></i>
         </button>

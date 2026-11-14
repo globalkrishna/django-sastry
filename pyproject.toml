@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "django-sastry"
-version = "1.0.5"
+version = "1.0.6"
 description = "A lightweight zero-config dynamic CRUD admin interface and interactive visual Entity Relations (ER) diagram for Django."
 readme = "README.md"
 authors = [
