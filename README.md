@@ -8,7 +8,7 @@
 A lightweight, zero-configuration dynamic CRUD administration interface and interactive visual **Entity Relations (ER) Diagram** engine for Django.
 
 <p align="center">
-  <img src="docs/images/er_diagram_preview.png" alt="Django Sastry Interactive ER Diagram" width="900" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+  <img src="https://raw.githubusercontent.com/globalkrishna/django-sastry/main/docs/images/er_diagram_preview.png" alt="Django Sastry Interactive ER Diagram" width="900" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
 </p>
 
 ---

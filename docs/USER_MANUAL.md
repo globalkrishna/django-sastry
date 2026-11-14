@@ -168,7 +168,7 @@ urlpatterns = [
 Access the diagram at `http://127.0.0.1:8000/sastry/er/` (or via the **ER Diagram** button in the top navigation).
 
 <p align="center">
-  <img src="images/er_diagram_preview.png" alt="Interactive Visual ER Diagram" width="900" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+  <img src="https://raw.githubusercontent.com/globalkrishna/django-sastry/main/docs/images/er_diagram_preview.png" alt="Interactive Visual ER Diagram" width="900" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
 </p>
 
 ```
