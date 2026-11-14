@@ -501,69 +501,88 @@ class SastryERDiagram {
     layoutNodes(relatedKeys, mainTableKey) {
         if (!this.viewport || !this.nodesLayer)
             return;
-        const cardSpacingX = 90;
-        const cardSpacingY = 24;
+        const cardSpacingX = 60;
+        const cardSpacingY = 50;
         const colWidth = 280;
         const activeColWidth = 320;
+        const startX = 60;
         const activeCard = document.getElementById(`er-card-${mainTableKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
         if (!activeCard)
             return;
+        const getCardHeight = (card) => {
+            if (!card)
+                return 260;
+            return card.offsetHeight || (card.getBoundingClientRect().height / (this.zoom || 1)) || 260;
+        };
         const totalRelated = relatedKeys.length;
-        // Distribute across columns (~4 to 5 tables per column, dynamically scaling to as many columns as needed)
-        const numCols = totalRelated > 0 ? Math.max(1, Math.ceil(totalRelated / 5)) : 0;
-        // Total width needed to fit all columns plus the Selected Table with generous margins
-        const neededWidth = numCols > 0
-            ? (140 + numCols * (colWidth + cardSpacingX) + activeColWidth + 140)
-            : (activeColWidth + 300);
-        const canvasWidth = Math.max(this.viewport.clientWidth, neededWidth);
-        // Position Selected Active Table at the RIGHT of the canvas
-        const selectedTableX = canvasWidth - activeColWidth - 100;
-        const selectedTableY = 60;
-        activeCard.style.left = `${selectedTableX}px`;
-        activeCard.style.top = `${selectedTableY}px`;
-        if (numCols === 0) {
-            const maxX = canvasWidth;
-            const maxY = selectedTableY + (activeCard.offsetHeight || 300) + 100;
-            this.nodesLayer.style.width = `${maxX}px`;
-            this.nodesLayer.style.height = `${Math.max(maxY, this.viewport.clientHeight)}px`;
-            this.resizeCanvas(maxX, Math.max(maxY, this.viewport.clientHeight));
+        // 0 related tables: center active card comfortably
+        if (totalRelated === 0) {
+            const activeTableX = Math.max(startX, (this.viewport.clientWidth - activeColWidth) / 2);
+            const activeTableY = 60;
+            activeCard.style.left = `${activeTableX}px`;
+            activeCard.style.top = `${activeTableY}px`;
+            const canvasWidth = Math.max(this.viewport.clientWidth, activeTableX + activeColWidth + 120);
+            const canvasHeight = Math.max(this.viewport.clientHeight, activeTableY + getCardHeight(activeCard) + 120);
+            this.nodesLayer.style.width = `${canvasWidth}px`;
+            this.nodesLayer.style.height = `${canvasHeight}px`;
+            this.resizeCanvas(canvasWidth, canvasHeight);
             return;
         }
-        // Columns are plotted from RIGHT to LEFT starting immediately to the left of Selected Table:
-        // Column 0 is closest to Selected Table, Column 1 to the left of that, etc.
-        const colXCoordinates = [];
-        for (let c = 0; c < numCols; c++) {
-            colXCoordinates.push(selectedTableX - cardSpacingX - colWidth - c * (colWidth + cardSpacingX));
+        // Determine cards per row: render 4-5 horizontally first, then move down
+        let cardsPerRow = 4;
+        if (totalRelated <= 5) {
+            cardsPerRow = Math.max(1, totalRelated);
         }
-        // Initialize column Y heights (starting at 60px)
-        const colHeights = new Array(numCols).fill(60);
-        const placeTable = (key) => {
-            const card = document.getElementById(`er-card-${key.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
-            if (!card)
-                return;
-            let bestCol = 0;
-            if (numCols > 1) {
-                let minH = colHeights[0];
-                for (let c = 1; c < numCols; c++) {
-                    if (colHeights[c] < minH) {
-                        minH = colHeights[c];
-                        bestCol = c;
-                    }
-                }
+        else if (totalRelated % 5 === 0) {
+            cardsPerRow = 5;
+        }
+        else {
+            cardsPerRow = 4;
+        }
+        const gridWidth = cardsPerRow * colWidth + (cardsPerRow - 1) * cardSpacingX;
+        // Position Selected Active Table prominently at top center of the grid
+        const centerOfGrid = startX + gridWidth / 2;
+        const activeTableX = Math.max(startX, centerOfGrid - activeColWidth / 2);
+        const activeTableY = 50;
+        activeCard.style.left = `${activeTableX}px`;
+        activeCard.style.top = `${activeTableY}px`;
+        const activeCardH = getCardHeight(activeCard);
+        const gridStartY = activeTableY + activeCardH + 80;
+        // Calculate rows and row heights
+        const numRows = Math.ceil(totalRelated / cardsPerRow);
+        const rowMaxHeights = new Array(numRows).fill(0);
+        // Pass 1: compute maximum height per row
+        for (let i = 0; i < totalRelated; i++) {
+            const row = Math.floor(i / cardsPerRow);
+            const card = document.getElementById(`er-card-${relatedKeys[i].replace(/[^a-zA-Z0-9_-]/g, '_')}`);
+            const h = getCardHeight(card);
+            if (h > rowMaxHeights[row]) {
+                rowMaxHeights[row] = h;
             }
-            const cardX = colXCoordinates[bestCol];
-            const cardY = colHeights[bestCol];
+        }
+        // Compute top Y position for each row
+        const rowYPositions = new Array(numRows).fill(0);
+        let runningY = gridStartY;
+        for (let r = 0; r < numRows; r++) {
+            rowYPositions[r] = runningY;
+            runningY += rowMaxHeights[r] + cardSpacingY;
+        }
+        // Pass 2: place related cards horizontally first (4-5 per row), then wrap to next row down
+        for (let i = 0; i < totalRelated; i++) {
+            const col = i % cardsPerRow;
+            const row = Math.floor(i / cardsPerRow);
+            const card = document.getElementById(`er-card-${relatedKeys[i].replace(/[^a-zA-Z0-9_-]/g, '_')}`);
+            if (!card)
+                continue;
+            const cardX = startX + col * (colWidth + cardSpacingX);
+            const cardY = rowYPositions[row];
             card.style.left = `${cardX}px`;
             card.style.top = `${cardY}px`;
-            const cardH = card.offsetHeight || (card.getBoundingClientRect().height / (this.zoom || 1)) || 260;
-            colHeights[bestCol] += cardH + cardSpacingY;
-        };
-        // Place all unique related tables
-        relatedKeys.forEach(placeTable);
-        // Compute total canvas dimensions
-        const maxColHeight = Math.max(...colHeights, selectedTableY + (activeCard.offsetHeight || 300));
-        const maxY = maxColHeight + 120;
-        const canvasHeight = Math.max(maxY, this.viewport.clientHeight);
+        }
+        // Canvas boundary sizing with padding
+        const maxContentX = Math.max(startX + gridWidth, activeTableX + activeColWidth);
+        const canvasWidth = Math.max(this.viewport.clientWidth, maxContentX + 100);
+        const canvasHeight = Math.max(this.viewport.clientHeight, runningY + 80);
         this.nodesLayer.style.width = `${canvasWidth}px`;
         this.nodesLayer.style.height = `${canvasHeight}px`;
         this.resizeCanvas(canvasWidth, canvasHeight);
@@ -603,12 +622,10 @@ class SastryERDiagram {
         const activePkRow = pkFieldName ? document.getElementById(`er-row-${main_table.replace(/[^a-zA-Z0-9_-]/g, '_')}-${pkFieldName}`) : null;
         // 1. Draw Incoming Reverse Relations (has_many) -> Pointing to Active Table PK
         if (activePkRow) {
-            const activePkAnchor = this.getRowAnchor(activePkRow, false);
-            const targetAnchorX = activePkAnchor.x;
-            const targetAnchorY = activePkAnchor.y;
             ctx.lineWidth = 1.5;
-            ctx.strokeStyle = '#0891b2'; // Cyan/Teal
-            ctx.fillStyle = '#0891b2';
+            const relStrokeColor = '#0891b2'; // Cyan/Teal
+            ctx.strokeStyle = relStrokeColor;
+            ctx.fillStyle = relStrokeColor;
             Object.keys(has_many || {}).forEach(relKey => {
                 const relData = has_many[relKey];
                 const relCardId = `er-card-${relKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
@@ -622,21 +639,13 @@ class SastryERDiagram {
                     if (Array.isArray(fTuple) && fTuple[1] === main_table) {
                         const relRow = document.getElementById(`er-row-${relKey.replace(/[^a-zA-Z0-9_-]/g, '_')}-${f}`);
                         if (relRow) {
-                            const relAnchor = this.getRowAnchor(relRow, true);
-                            const startX = relAnchor.x;
-                            const startY = relAnchor.y;
-                            this.drawSpline(ctx, startX, startY, targetAnchorX, targetAnchorY, '#0891b2');
-                            // Draw Arrowhead at active PK left
-                            ctx.fillStyle = '#0891b2';
-                            ctx.beginPath();
-                            ctx.moveTo(targetAnchorX, targetAnchorY);
-                            ctx.lineTo(targetAnchorX - 7, targetAnchorY - 4);
-                            ctx.lineTo(targetAnchorX - 7, targetAnchorY + 4);
-                            ctx.closePath();
-                            ctx.fill();
+                            const pts = this.getCardConnectionPoints(relRow, activePkRow);
+                            this.drawSpline(ctx, pts.startX, pts.startY, pts.endX, pts.endY, pts.startIsRight, pts.endIsRight, relStrokeColor);
+                            // Draw Arrowhead at active PK anchor
+                            this.drawArrowhead(ctx, pts.endX, pts.endY, pts.endIsRight, relStrokeColor);
                             // Draw anchor dot at source row
                             ctx.beginPath();
-                            ctx.arc(startX, startY, 3, 0, 2 * Math.PI);
+                            ctx.arc(pts.startX, pts.startY, 3, 0, 2 * Math.PI);
                             ctx.fill();
                         }
                     }
@@ -664,37 +673,92 @@ class SastryERDiagram {
                     }
                     const targetPkRow = document.getElementById(`er-row-${targetKey.replace(/[^a-zA-Z0-9_-]/g, '_')}-${targetPkField}`);
                     if (targetPkRow) {
-                        const fkAnchor = this.getRowAnchor(fkRow, false);
-                        const targetPkAnchor = this.getRowAnchor(targetPkRow, true);
-                        const startX = fkAnchor.x;
-                        const startY = fkAnchor.y;
-                        const endX = targetPkAnchor.x;
-                        const endY = targetPkAnchor.y;
                         const strokeColor = this.fkColors[colorIdx % this.fkColors.length];
                         colorIdx++;
-                        this.drawSpline(ctx, startX, startY, endX, endY, strokeColor);
-                        // Draw small circle anchor at target PK (right edge)
+                        const pts = this.getCardConnectionPoints(fkRow, targetPkRow);
+                        this.drawSpline(ctx, pts.startX, pts.startY, pts.endX, pts.endY, pts.startIsRight, pts.endIsRight, strokeColor);
+                        // Draw small circle anchor at target PK
                         ctx.fillStyle = strokeColor;
                         ctx.beginPath();
-                        ctx.arc(endX, endY, 4, 0, 2 * Math.PI);
+                        ctx.arc(pts.endX, pts.endY, 4, 0, 2 * Math.PI);
                         ctx.fill();
-                        // Draw small dot at start FK (left edge)
+                        // Draw small dot at start FK
                         ctx.beginPath();
-                        ctx.arc(startX, startY, 3, 0, 2 * Math.PI);
+                        ctx.arc(pts.startX, pts.startY, 3, 0, 2 * Math.PI);
                         ctx.fill();
                     }
                 }
             }
         });
     }
-    drawSpline(ctx, startX, startY, endX, endY, color) {
+    getCardConnectionPoints(sourceRow, targetRow) {
+        const sourceCard = sourceRow.closest('.er-table-card');
+        const targetCard = targetRow.closest('.er-table-card');
+        const sourceCardLeft = sourceCard ? (parseFloat(sourceCard.style.left) || 0) : 0;
+        const sourceCardWidth = sourceCard ? (sourceCard.offsetWidth || 280) : 280;
+        const sourceCardRight = sourceCardLeft + sourceCardWidth;
+        const sourceCardCenterX = sourceCardLeft + sourceCardWidth / 2;
+        const targetCardLeft = targetCard ? (parseFloat(targetCard.style.left) || 0) : 0;
+        const targetCardWidth = targetCard ? (targetCard.offsetWidth || 320) : 320;
+        const targetCardRight = targetCardLeft + targetCardWidth;
+        const targetCardCenterX = targetCardLeft + targetCardWidth / 2;
+        let startIsRight = true;
+        let endIsRight = false;
+        // Direct left-to-right relation with gap
+        if (sourceCardRight + 20 <= targetCardLeft) {
+            startIsRight = true;
+            endIsRight = false;
+        }
+        else if (targetCardRight + 20 <= sourceCardLeft) {
+            // Direct right-to-left relation with gap
+            startIsRight = false;
+            endIsRight = true;
+        }
+        else if (sourceCardCenterX <= targetCardCenterX) {
+            // Overlapping or vertical relation: source is to the left of target center
+            startIsRight = false;
+            endIsRight = false;
+        }
+        else {
+            // Overlapping or vertical relation: source is to the right of target center
+            startIsRight = true;
+            endIsRight = true;
+        }
+        const startAnchor = this.getRowAnchor(sourceRow, startIsRight);
+        const endAnchor = this.getRowAnchor(targetRow, endIsRight);
+        return {
+            startX: startAnchor.x,
+            startY: startAnchor.y,
+            endX: endAnchor.x,
+            endY: endAnchor.y,
+            startIsRight,
+            endIsRight
+        };
+    }
+    drawArrowhead(ctx, tipX, tipY, approachingFromRight, color) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(tipX, tipY);
+        if (approachingFromRight) {
+            // Arrowhead enters the right edge from the right: tip is at tipX
+            ctx.lineTo(tipX + 7, tipY - 4);
+            ctx.lineTo(tipX + 7, tipY + 4);
+        }
+        else {
+            // Arrowhead enters the left edge from the left: tip is at tipX
+            ctx.lineTo(tipX - 7, tipY - 4);
+            ctx.lineTo(tipX - 7, tipY + 4);
+        }
+        ctx.closePath();
+        ctx.fill();
+    }
+    drawSpline(ctx, startX, startY, endX, endY, startIsRight, endIsRight, color) {
         ctx.lineWidth = 1.8;
         ctx.strokeStyle = color;
-        const dx = endX - startX;
-        const curvature = Math.min(180, Math.max(40, Math.abs(dx) * 0.45));
-        const cp1X = dx >= 0 ? startX + curvature : startX - curvature;
+        const curvature = Math.min(140, Math.max(35, Math.abs(endX - startX) * 0.4 + Math.abs(endY - startY) * 0.15));
+        const cp1X = startIsRight ? startX + curvature : startX - curvature;
         const cp1Y = startY;
-        const cp2X = dx >= 0 ? endX - curvature : endX + curvature;
+        const cp2X = endIsRight ? endX + curvature : endX - curvature;
         const cp2Y = endY;
         ctx.beginPath();
         ctx.moveTo(startX, startY);

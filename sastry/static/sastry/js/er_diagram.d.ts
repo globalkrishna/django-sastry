@@ -101,6 +101,8 @@ declare class SastryERDiagram {
     private layoutNodes;
     private resizeCanvas;
     drawConnections(): void;
+    private getCardConnectionPoints;
+    private drawArrowhead;
     private drawSpline;
     private getRowAnchor;
     private getRelativeRect;
