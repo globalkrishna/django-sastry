@@ -129,6 +129,9 @@
   top: 0;
   left: 0;
   transform-origin: 0 0;
+}
+
+.er-viewport.is-panning .er-stage {
   will-change: transform;
 }
 
@@ -249,6 +252,10 @@
   font-size: 0.8rem;
   overflow: hidden;
   user-select: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+  backface-visibility: hidden;
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
