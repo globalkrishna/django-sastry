@@ -1146,7 +1146,7 @@ class SastryERDiagram {
         void card.offsetWidth; // Force DOM reflow
         card.classList.add('er-card-pulse');
     }
-    generateStandaloneSvg() {
+    generateStandaloneSvg(pureVector = false) {
         if (!this.nodesLayer || !this.svgGroup)
             return null;
         const cards = Array.from(this.nodesLayer.querySelectorAll('.er-table-card'));
@@ -1206,15 +1206,73 @@ class SastryERDiagram {
             const cardY = (parseFloat(card.style.top) || 0) + offsetY;
             const cardW = card.offsetWidth || 280;
             const cardH = card.offsetHeight || 260;
-            const cleanCardHtml = card.outerHTML
-                .replace(/style="[^"]*left:[^"]*"/g, `style="position:relative; width:${cardW}px; height:${cardH}px;"`);
-            cardsHtml += `
-        <foreignObject x="${cardX}" y="${cardY}" width="${cardW}" height="${cardH}">
-          <div xmlns="http://www.w3.org/1999/xhtml">
-            ${cleanCardHtml}
-          </div>
-        </foreignObject>
-      `;
+            if (pureVector) {
+                // Pure vector rendering: avoids foreignObject so canvas is never tainted on export
+                const headerH = 34;
+                const isSelected = card.classList.contains('active-table');
+                const isForeign = card.classList.contains('foreign-table');
+                let headerBg = '#0891b2';
+                let headerTextColor = '#ffffff';
+                if (isSelected) {
+                    headerBg = '#facc15';
+                    headerTextColor = '#1e293b';
+                }
+                else if (isForeign) {
+                    headerBg = '#ea580c';
+                    headerTextColor = '#ffffff';
+                }
+                const titleText = card.querySelector('.er-table-title')?.textContent?.trim() || '';
+                const badgeEl = card.querySelector('.er-table-badge');
+                const badgeStr = badgeEl?.textContent?.trim() || '';
+                let rowsSvg = '';
+                const rows = Array.from(card.querySelectorAll('.er-field-row'));
+                let rowY = headerH;
+                const rowH = 24;
+                rows.forEach(row => {
+                    const isRowSelected = row.classList.contains('selected');
+                    const isRowPk = row.classList.contains('pk-field');
+                    const isRowFk = row.classList.contains('fk-field');
+                    const name = row.querySelector('.er-field-name')?.textContent?.trim() || '';
+                    const type = row.querySelector('.er-field-type')?.textContent?.trim() || '';
+                    const icon = isRowPk ? 'PK' : (isRowFk ? 'FK' : '•');
+                    const rowBg = isRowSelected
+                        ? (isDark ? 'rgba(56, 189, 248, 0.18)' : 'rgba(14, 165, 233, 0.12)')
+                        : 'transparent';
+                    rowsSvg += `
+            <rect x="0" y="${rowY}" width="${cardW}" height="${rowH}" fill="${rowBg}"/>
+            <line x1="0" y1="${rowY + rowH}" x2="${cardW}" y2="${rowY + rowH}" stroke="${rowBorder}" stroke-width="1"/>
+            <text x="10" y="${rowY + 16}" font-size="10" font-family="monospace" font-weight="bold" fill="${isRowPk ? '#facc15' : textMuted}">${icon}</text>
+            <text x="32" y="${rowY + 16}" font-size="11" font-family="monospace" font-weight="${isRowPk ? 'bold' : 'normal'}" fill="${textColor}">${name}</text>
+            <text x="${cardW - 12}" y="${rowY + 16}" font-size="10" text-anchor="end" font-family="system-ui, sans-serif" fill="${textMuted}">${type}</text>
+          `;
+                    rowY += rowH;
+                });
+                const actualCardH = Math.max(cardH, rowY);
+                cardsHtml += `
+          <g transform="translate(${cardX}, ${cardY})">
+            <rect width="${cardW}" height="${actualCardH}" rx="8" ry="8" fill="${cardBg}" stroke="${cardBorder}" stroke-width="1"/>
+            <path d="M 0 8 Q 0 0 8 0 L ${cardW - 8} 0 Q ${cardW} 0 ${cardW} 8 L ${cardW} ${headerH} L 0 ${headerH} Z" fill="${headerBg}"/>
+            <line x1="0" y1="${headerH}" x2="${cardW}" y2="${headerH}" stroke="${cardBorder}" stroke-width="1"/>
+            <text x="12" y="22" font-size="12" font-weight="bold" font-family="system-ui, sans-serif" fill="${headerTextColor}">${titleText}</text>
+            ${badgeStr ? `
+              <rect x="${cardW - 100}" y="8" width="90" height="18" rx="9" ry="9" fill="rgba(255,255,255,0.25)"/>
+              <text x="${cardW - 55}" y="20" font-size="9" text-anchor="middle" font-weight="600" font-family="system-ui, sans-serif" fill="${headerTextColor}">${badgeStr}</text>
+            ` : ''}
+            ${rowsSvg}
+          </g>
+        `;
+            }
+            else {
+                const cleanCardHtml = card.outerHTML
+                    .replace(/style="[^"]*left:[^"]*"/g, `style="position:relative; width:${cardW}px; height:${cardH}px;"`);
+                cardsHtml += `
+          <foreignObject x="${cardX}" y="${cardY}" width="${cardW}" height="${cardH}">
+            <div xmlns="http://www.w3.org/1999/xhtml">
+              ${cleanCardHtml}
+            </div>
+          </foreignObject>
+        `;
+            }
         });
         return `
       <svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}">
@@ -1239,7 +1297,7 @@ class SastryERDiagram {
         this.downloadBlob(blob, `sastry-er-${this.activeApp}-${this.activeModel}.svg`);
     }
     exportPng() {
-        const svgContent = this.generateStandaloneSvg();
+        const svgContent = this.generateStandaloneSvg(true);
         if (!svgContent)
             return;
         const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
@@ -1254,11 +1312,20 @@ class SastryERDiagram {
             if (ctx) {
                 ctx.scale(scale, scale);
                 ctx.drawImage(img, 0, 0);
-                canvas.toBlob((pngBlob) => {
-                    if (pngBlob) {
-                        this.downloadBlob(pngBlob, `sastry-er-${this.activeApp}-${this.activeModel}.png`);
-                    }
-                }, 'image/png');
+                try {
+                    canvas.toBlob((pngBlob) => {
+                        if (pngBlob) {
+                            this.downloadBlob(pngBlob, `sastry-er-${this.activeApp}-${this.activeModel}.png`);
+                        }
+                        else {
+                            this.exportSvg();
+                        }
+                    }, 'image/png');
+                }
+                catch (e) {
+                    console.warn('Canvas export tainted, falling back to SVG:', e);
+                    this.exportSvg();
+                }
             }
             URL.revokeObjectURL(url);
         };

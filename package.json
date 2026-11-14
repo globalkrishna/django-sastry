@@ -1,6 +1,6 @@
 {
   "name": "django-sastry",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Frontend TypeScript sources for django-sastry",
   "scripts": {
     "build": "tsc",

@@ -126,7 +126,7 @@ declare class SastryERDiagram {
     private renderInspector;
     jumpToModel(fullLabel: string): void;
     highlightAndScrollToNode(tableKey: string): void;
-    generateStandaloneSvg(): string | null;
+    generateStandaloneSvg(pureVector?: boolean): string | null;
     exportSvg(): void;
     exportPng(): void;
     private downloadBlob;
