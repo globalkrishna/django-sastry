@@ -60,34 +60,58 @@ export class db_crud {
         }
     }
     setData() {
-        if (!this.filter || Object.keys(this.filter).length === 0) {
-            this.filter = JSON.parse(document.getElementById('ApplyFilter').getAttribute('data-filter') || '{}');
-            this.FilterOR = document.getElementById('FilterOR').checked;
-            this.exclude = JSON.parse(document.getElementById('ApplyFilter').getAttribute('data-exclude') || '{}');
+        const applyFilter = document.getElementById('ApplyFilter');
+        const cruForm = document.getElementById('cru_form');
+        const tbody = document.querySelector('#index tbody');
+        if (!applyFilter || !cruForm || !tbody) {
+            return;
         }
-        this.href = document.getElementById('cru_form').getAttribute('action');
-        this.collection = JSON.parse(document.querySelector('#index tbody').dataset.rows || '[]');
+        if (!this.filter || Object.keys(this.filter).length === 0) {
+            try {
+                this.filter = JSON.parse(applyFilter.getAttribute('data-filter') || '{}');
+            }
+            catch {
+                this.filter = {};
+            }
+            const filterOrEl = document.getElementById('FilterOR');
+            this.FilterOR = filterOrEl ? filterOrEl.checked : false;
+            try {
+                this.exclude = JSON.parse(applyFilter.getAttribute('data-exclude') || '{}');
+            }
+            catch {
+                this.exclude = {};
+            }
+        }
+        this.href = cruForm.getAttribute('action') || this.href;
+        try {
+            this.collection = JSON.parse(tbody.dataset.rows || '[]');
+        }
+        catch {
+            this.collection = [];
+        }
         this.fields = Array.from(document.querySelectorAll('#index th')).map(x => {
             let dat = (x.getAttribute('data-col') || '').split(',');
-            dat[2] = dat[2].toLowerCase() == 'true';
+            dat[2] = dat[2] && dat[2].toLowerCase() == 'true';
             dat.push(x.classList.contains('d-none'));
             return dat;
         });
-        document.getElementById('HideColumns').innerHTML = this.fields.slice(1).reduce((iv, cv, ndx) => {
-            let val = cv[0];
-            if (val.endsWith('_id'))
-                val = val.slice(0, -3);
-            val = val.replaceAll('_', ' ');
-            return (iv + '<div class="form-check">' +
-                `<input class="form-check-input" type="checkbox" value="${2 + ndx}" ${cv[3] ? ' checked' : ''}>` +
-                `<label class="form-check-label text-capitalize" for="flexCheckDefault">${val}</label></div>`);
-        }, '');
+        const hideCols = document.getElementById('HideColumns');
+        if (hideCols) {
+            hideCols.innerHTML = this.fields.slice(1).reduce((iv, cv, ndx) => {
+                let val = cv[0] || '';
+                if (val.endsWith('_id'))
+                    val = val.slice(0, -3);
+                val = val.replaceAll('_', ' ');
+                return (iv + '<div class="form-check">' +
+                    `<input class="form-check-input" type="checkbox" value="${2 + ndx}" ${cv[3] ? ' checked' : ''}>` +
+                    `<label class="form-check-label text-capitalize" for="flexCheckDefault">${val}</label></div>`);
+            }, '');
+        }
         this.lkup = Object.fromEntries(Array.from(document.querySelectorAll('#cru_form datalist'))
             .map(s => [s.id.slice(2), Object.fromEntries(Array.from(s.querySelectorAll('option'))
                 .map((o) => [o.dataset.pk, o.value]))]));
         this.xpos = -1;
-        const cf = document.getElementById('cru_form');
-        this.form = cf.innerHTML;
+        this.form = cruForm.innerHTML;
         this.sel_rows = [];
         this.render();
     }
@@ -876,7 +900,12 @@ export class db_crud {
                 const rawEid = eid.endsWith('_id') ? eid.slice(0, -3) : eid;
                 const editLkup = (this.lkup && (this.lkup[eid] || this.lkup[rawEid] || this.lkup[`${rawEid}_id`])) || null;
                 const isFalsy = !td.dataset.val || td.dataset.val === 'null' || td.dataset.val === 'None' || td.dataset.val === 'undefined';
-                f.querySelector('input[list]').value = (!isFalsy && editLkup?.[td.dataset.val]) ? editLkup[td.dataset.val] : (isFalsy ? '' : td.dataset.val);
+                const fkInput = f.querySelector('input[list]');
+                if (fkInput) {
+                    fkInput.value = (!isFalsy && editLkup?.[td.dataset.val]) ? editLkup[td.dataset.val] : (isFalsy ? '' : td.dataset.val);
+                    fkInput.onclick = () => fkInput.select();
+                    fkInput.onfocus = () => fkInput.select();
+                }
                 const dl = document.getElementById(`FK${eid}`) || document.getElementById(`FK${rawEid}`);
                 if (dl) {
                     f.querySelector('form').appendChild(dl.cloneNode(true));
@@ -926,7 +955,20 @@ export class AdminerEdit extends db_crud {
         super();
         if (document.getElementById('sel-app')) {
             document.getElementById('sel-app').onchange = (e) => this.setApp(e);
-            document.getElementById('app-model').onchange = (e) => this.loadModel(e);
+            const appModelEl = document.getElementById('app-model');
+            if (appModelEl) {
+                appModelEl.onchange = (e) => this.loadModel(e);
+                appModelEl.onclick = () => {
+                    const selApp = document.getElementById('sel-app');
+                    const prefix = (selApp && selApp.value) ? selApp.value + '_' : '';
+                    if (appModelEl.value && appModelEl.value !== prefix) {
+                        appModelEl.value = prefix;
+                    }
+                    else if (!appModelEl.value && prefix) {
+                        appModelEl.value = prefix;
+                    }
+                };
+            }
             const path = window.location.pathname;
             const preRendered = document.getElementById('index');
             if (preRendered) {
@@ -968,7 +1010,7 @@ export class AdminerEdit extends db_crud {
         }
     }
     setApp(e) {
-        document.getElementById('app-model').value = e.target.value + '_';
+        document.getElementById('app-model').value = e.target.value ? e.target.value + '_' : '';
         document.getElementById('app-model').focus();
     }
     loadModel(e) {
@@ -977,15 +1019,35 @@ export class AdminerEdit extends db_crud {
             e.preventDefault();
             app_mdl = e.target.getAttribute('href');
         }
+        if (!app_mdl || app_mdl.endsWith('_'))
+            return;
         this.href = (window.location.pathname.startsWith('/sastry/') ? '/sastry/' : '/index/') + app_mdl.replace('_', '/') + '/';
-        document.getElementById('content_d').innerHTML = this.spinner;
-        fetch(this.href + '{}')
-            .then(response => response.text())
-            .then(data => {
-            document.getElementById('content_d').innerHTML = data;
-            this.setData();
+        const contentD = document.getElementById('content_d');
+        if (contentD)
+            contentD.innerHTML = this.spinner;
+        fetch(this.href + '{}/', {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
         })
-            .catch(error => console.error('Error:', error));
+            .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.text();
+        })
+            .then(data => {
+            if (contentD) {
+                contentD.innerHTML = data;
+                this.setData();
+            }
+        })
+            .catch(error => {
+            console.error('Error:', error);
+            if (contentD) {
+                contentD.innerHTML = `<div class="alert alert-danger m-3">Failed to load model: ${error.message}</div>`;
+            }
+        });
     }
 }
 window.db_crud = db_crud;

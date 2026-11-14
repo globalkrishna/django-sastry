@@ -15,7 +15,8 @@
   <div class="col-auto">
     <input list="AppMdl" class="form-control form-control-sm py-0 my-0 fw-bold" spellcheck="false"
       style="font-size:0.9rem;" id="app-model" value="" placeholder="Search model..." autocomplete="off"
-      onmousedown="if(!value && document.getElementById('sel-app').value) value = document.getElementById('sel-app').value + '_';" />
+      onclick="handleModelInputClick(this);"
+      onfocus="handleModelInputClick(this);" />
     <datalist id="AppMdl" class="fw-bold">
       {% for mk, mv in madmin | dictsort() %}
       {% for v in mv | sort %}
@@ -40,6 +41,15 @@
     function clearFields() {
       document.getElementById('app-model').value = '';
       document.getElementById('sel-app').value = '';
+    }
+    function handleModelInputClick(el) {
+      const selApp = document.getElementById('sel-app') ? document.getElementById('sel-app').value : '';
+      const prefix = selApp ? selApp + '_' : '';
+      if (el.value && el.value !== prefix) {
+        el.value = prefix;
+      } else if (!el.value && prefix) {
+        el.value = prefix;
+      }
     }
   </script>
 </form>

@@ -203,25 +203,14 @@ def index(request):
     return render(request, "s_admin.html", {"madmin": mdd})
 
 
-def optimize_form_querysets(form, rows=None, max_limit=150):
-    """Limit foreign key field querysets to prevent loading tens of thousands of rows per form."""
+def optimize_form_querysets(form, rows=None, max_limit=None):
+    """Ensure foreign key field querysets load all available choices for datalists without restrictive filtering."""
     for field_name, field in form.fields.items():
         if hasattr(field, "queryset") and field.queryset is not None:
             try:
-                used_ids = set()
-                if rows:
-                    col_name = field_name + "_id"
-                    for r in rows:
-                        val = r.get(col_name) if col_name in r else r.get(field_name)
-                        if val and isinstance(val, (int, str)) and str(val).isdigit():
-                            used_ids.add(int(val))
-
-                if used_ids:
-                    field.queryset = field.queryset.filter(pk__in=used_ids)
-                elif max_limit:
-                    field.queryset = field.queryset.all()[:max_limit]
-                else:
-                    field.queryset = field.queryset.all()
+                # Do NOT filter to pk__in=used_ids, as that prevents users from selecting
+                # any foreign key not already present in the currently loaded page rows.
+                field.queryset = field.queryset.all()
             except Exception:
                 pass
     return form
