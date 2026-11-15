@@ -25,8 +25,15 @@
    - [Custom ERP Page Templates & Offcanvas Filters](#custom-erp-page-templates--offcanvas-filters)
    - [Extending the Frontend Controller (`db_crud`)](#extending-the-frontend-controller-db_crud)
    - [Adding Custom Action Buttons (e.g., "Orders" Drawer)](#adding-custom-action-buttons-eg-orders-drawer)
-6. [Security & Access Control](#6-security--access-control)
-7. [API Reference](#7-api-reference)
+6. [Multi-Tenant SaaS Architecture & Row-Level Isolation](#6-multi-tenant-saas-architecture--row-level-isolation)
+   - [The Problem & Sastry Solution](#the-problem--sastry-solution)
+   - [Enabling Native Multi-Tenancy (`settings.py`)](#enabling-native-multi-tenancy-settingspy)
+   - [How the Engine Works Under the Hood](#how-the-engine-works-under-the-hood)
+7. [Security & Access Control](#7-security--access-control)
+8. [API Reference](#8-api-reference)
+   - [Python Backend Functions (`sastry.dbadmin`)](#python-backend-functions-sastrydbadmin)
+   - [Multi-Tenant Engine API (`sastry.tenant.TenantManager`)](#multi-tenant-engine-api-sastrytenanttenantmanager)
+   - [Frontend Classes & Hooks (`s_crud.js` & `er_diagram.js`)](#frontend-classes--hooks-s_crudjs--er_diagramjs)
 
 ---
 
@@ -630,6 +637,18 @@ Access to Sastry endpoints is restricted at the view level using `@login_require
 | `er_schema_api(request, app_label, model_name)` | `(HttpRequest, str, str) -> JsonResponse` | Returns schema metadata, field types, PK/FK flags, foreign models, and `has_many` child models. |
 | `getData(app, mdl, dat)` | `(str, str, dict) -> dict` | Introspects model, executes paginated/filtered queries, and formats columns and records for the grid. |
 | `optimize_form_querysets(form, rows, max_limit)` | `(Form, list, int) -> Form` | Prevents runaway database queries on foreign key dropdown fields. |
+
+### Multi-Tenant Engine API (`sastry.tenant.TenantManager`)
+
+| Method | Signature | Description |
+|---|---|---|
+| `resolve_tenant(request)` | `(HttpRequest) -> Optional[Any]` | Resolves the active tenant instance by inspecting configured request attributes (`request.store`, `request.tenant`, etc.). |
+| `is_authorized(request)` | `(HttpRequest) -> bool` | Evaluates whether the request user is authorized to access Sastry under the current single-tenant or multi-tenant permission policy. |
+| `is_model_allowed(request, app_label, model_name)` | `(HttpRequest, str, str) -> bool` | Checks if a specific model is accessible to the active user (enforcing whitelists, blacklists, and superuser bypass). |
+| `get_allowed_models_dict(request)` | `(HttpRequest) -> dict[str, list[Model]]` | Returns a filtered dictionary of `{app_label: [models...]}` accessible to the current tenant user. |
+| `scope_query_filter(request, model, base_filter)` | `(HttpRequest, Model, dict) -> dict` | Automatically injects the tenant foreign key filter (e.g. `{"store_id": request.store.id}`) into the query filter dictionary. |
+| `validate_and_stamp_instance(request, instance, is_new)` | `(HttpRequest, Model, bool) -> tuple[bool, Optional[str]]` | Enforces cross-tenant mutation protection and auto-assigns tenant foreign key on newly created records. |
+| `scope_form_queryset(request, form)` | `(HttpRequest, Form) -> Form` | Filters foreign key `<select>` dropdown choices to display only records belonging to the active tenant. |
 
 ### Frontend Classes & Hooks (`s_crud.js` & `er_diagram.js`)
 

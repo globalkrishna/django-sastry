@@ -205,13 +205,42 @@ urlpatterns = [
 ]
 ```
 
-### 4. Collect Static Assets
+### 4. (Optional) Enable Native Multi-Tenancy for SaaS
+
+To enable automatic tenant/store row-level isolation and role-based model whitelisting, add `SASTRY_MULTI_TENANT` to your `settings.py`:
+
+```python
+SASTRY_MULTI_TENANT = {
+    "ENABLED": True,
+    # Attributes on request to resolve active tenant (e.g. request.store or request.tenant)
+    "TENANT_REQUEST_ATTRS": ["store", "tenant", "organization", "company"],
+    # Model foreign key field names indicating tenant ownership
+    "TENANT_MODEL_FIELDS": ["store", "tenant", "organization", "company"],
+    # Permission mode: 'staff_with_tenant', 'superuser_only', or custom callable
+    "PERMISSION_MODE": "staff_with_tenant",
+    # Model Whitelist for tenant users (Superusers retain unrestricted access)
+    "ALLOWED_MODELS": {
+        "inventory": ["PurchaseOrder", "Vendor", "Purchase", "DebitNote", "StoreInventory"],
+        "billing": ["Customer", "SalesPerson", "Invoice"],
+        "catalog": ["Product", "ProductVariant"],
+    },
+    # Models always hidden from non-superusers
+    "EXCLUDED_MODELS": [
+        "admin.*", "sessions.*", "contenttypes.*", "auth.Permission",
+        "tenants.Tenant", "tenants.Store",
+    ],
+    # Automatically stamp tenant foreign key when new records are created
+    "AUTO_STAMP_ON_CREATE": True,
+}
+```
+
+### 5. Collect Static Assets
 
 ```bash
 python manage.py collectstatic --noinput
 ```
 
-### 5. Access the Interfaces
+### 6. Access the Interfaces
 
 Start your development server:
 
@@ -224,11 +253,26 @@ python manage.py runserver
 
 ---
 
+## Native Multi-Tenant SaaS Architecture
+
+In multi-tenant SaaS environments (retail POS, franchise ERPs, multi-entity accounting), exposing monolithic admin interfaces to store staff is a critical security and privacy hazard.
+
+`django-sastry` 2.0 incorporates a first-class **Multi-Tenant Engine (`sastry.tenant.TenantManager`)**:
+
+- **Automatic Row-Level Scoping**: Queries automatically inject tenant filters (`store_id = request.store.id`). Store 160 can never view or manipulate rows from Store 161.
+- **Model Gatekeeping**: Tenant staff only see allowed business models (`ALLOWED_MODELS`). Accessing system tables (`Tenant`, `User`, `Sessions`) returns an HTTP 403 Forbidden.
+- **Safe Auto-Stamping**: Newly created records are automatically stamped with `instance.store = request.store`, eliminating cashier dropdown errors.
+- **Cross-Tenant Mutation Protection**: Updates and deletes verify tenant ownership before committing, preventing cross-tenant ID spoofing.
+- **Foreign Key Choice Scoping**: Form dropdowns in modals only list relational choices (Vendors, Customers, Warehouses) belonging to the active tenant.
+- **100% Backward Compatible**: When `SASTRY_MULTI_TENANT` is omitted, Sastry operates in standard single-tenant mode with zero overhead.
+
+---
+
 ## Security & Permissions
 
-Access to `/sastry/` and `/sastry/er/` requires standard administrator authentication:
-- `request.user.is_superuser` or `request.user.is_admin` must evaluate to `True`.
-- Non-administrators receive an HTTP 403 Forbidden response.
+Access to `/sastry/` and `/sastry/er/` is evaluated dynamically based on your configuration:
+- **Single-Tenant Mode (Default)**: Access is strictly restricted to `request.user.is_superuser` or `request.user.is_admin`.
+- **Multi-Tenant Mode**: Authenticated tenant staff operating within an active tenant context (`request.store` / `request.tenant`) are granted scoped access to whitelisted models, while superusers retain global visibility across all stores.
 
 ---
 

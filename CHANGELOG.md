@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.1] - 2026-11-15
+
+### Documentation & Packaging Refinement
+- **Documentation**:
+  - Added dedicated Multi-Tenant SaaS quickstart guide and annotated `SASTRY_MULTI_TENANT` configuration block directly to `README.md`.
+  - Added full API reference for `sastry.tenant.TenantManager` in `docs/USER_MANUAL.md`.
+  - Updated Table of Contents and security policy documentation to reflect multi-tenant authorization modes.
+- **Packaging**:
+  - Ensured PEP-compliant `PKG-INFO` injection for source distributions (`sdist`).
+
+---
+
 ## [2.0.0] - 2026-11-15
 
 ### Major Architectural Milestone: Native Multi-Tenant SaaS Engine
