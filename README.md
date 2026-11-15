@@ -32,9 +32,15 @@ A lightweight, zero-configuration dynamic CRUD administration interface and inte
    - Easily inject custom modules into the navigation bar (Orders, Customer, Inventory, BOM, Sales, Billing).
    - Reusable `getData` / `mdlData` backend pipelines and subclassable frontend controllers (`class CustomerController extends db_crud`) with custom action triggers (like `#ShowExtraDetail` for Orders).
 
-4. **Lightweight & Non-Intrusive**:
+4. **Native Multi-Tenant SaaS Architecture & Row-Level Isolation**:
+   - Zero-boilerplate multi-tenancy: automatic row-level query scoping (`store_id = request.store.id` or `tenant_id = request.tenant.id`).
+   - Role-based model whitelisting preventing non-superusers from inspecting or altering sensitive system tables.
+   - Automatic tenant foreign key stamping on record creation and safe tenant ownership validation on mutation.
+   - 100% backward-compatible: transparently disabled when `SASTRY_MULTI_TENANT` is omitted.
+
+5. **Lightweight & Non-Intrusive**:
    - Introspects model structure using Django's native `Model._meta` APIs in memory with zero database queries during diagram generation.
-   - Zero external frontend dependencies: built with modern vanilla ES6 JavaScript and HTML5 Canvas.
+   - Zero external frontend dependencies: built with modern vanilla ES6 JavaScript and pure SVG / HTML5 Canvas.
 
 ---
 

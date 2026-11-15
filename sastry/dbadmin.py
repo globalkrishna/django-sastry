@@ -142,42 +142,41 @@ def get_model_relations_data(app_label, model_name):
     }
 
 
+from sastry.tenant import tenant_manager
+
+
 @login_required
 def er_view(request):
     """Render the full-featured interactive Entity Relations (ER) diagram."""
-    if not (request.user.is_superuser or getattr(request.user, "is_admin", False)):
+    if not tenant_manager.is_authorized(request):
         return HttpResponseForbidden("Access restricted to administrators.")
-    mdd = {}
-    for m in apps.get_models():
-        lbl = m._meta.app_label
-        if lbl in ["admin", "contenttypes", "sessions"]:
-            continue
-        if lbl not in mdd:
-            mdd[lbl] = []
-        mdd[lbl].append(m.__name__)
-
-    mdd = {k: sorted(v) for k, v in sorted(mdd.items())}
+    mdd = tenant_manager.get_allowed_models_dict(request)
     default_app = request.GET.get("app", list(mdd.keys())[0] if mdd else "")
     default_model = request.GET.get(
         "model", mdd[default_app][0] if default_app in mdd and mdd[default_app] else ""
     )
 
-    return render(
-        request,
-        "erview/default.html",
-        {
-            "madmin": mdd,
-            "default_app": default_app,
-            "default_model": default_model,
-        },
-    )
+    context = {
+        "madmin": mdd,
+        "default_app": default_app,
+        "default_model": default_model,
+    }
+    tenant_obj = tenant_manager.resolve_tenant(request)
+    if tenant_obj:
+        context["tenant_obj"] = tenant_obj
+        context["store"] = tenant_obj
+        context["active_store"] = tenant_obj
+
+    return render(request, "erview/default.html", context)
 
 
 @login_required
 def er_schema_api(request, app_label, model_name):
     """JSON API returning entity relations data for diagram visualization."""
-    if not (request.user.is_superuser or getattr(request.user, "is_admin", False)):
+    if not tenant_manager.is_authorized(request):
         return HttpResponseForbidden("Access restricted to administrators.")
+    if not tenant_manager.is_model_allowed(request, app_label, model_name):
+        return HttpResponseForbidden(f"Access to schema for '{app_label}.{model_name}' is restricted.")
     try:
         data = get_model_relations_data(app_label, model_name)
         return JsonResponse(data)
@@ -190,25 +189,26 @@ def er_schema_api(request, app_label, model_name):
 @login_required
 def index(request):
     assert isinstance(request, HttpRequest)
-    if not (request.user.is_superuser or getattr(request.user, "is_admin", False)):
+    if not tenant_manager.is_authorized(request):
         return HttpResponseForbidden("Access restricted to administrators.")
-    mdd = {}
-    for m in apps.get_models():
-        lbl = m._meta.app_label
-        if lbl in ["admin", "contenttypes", "sessions"]:
-            continue
-        if lbl not in mdd:
-            mdd[lbl] = []
-        mdd[lbl].append(m.__name__)
-    return render(request, "s_admin.html", {"madmin": mdd})
+    mdd = tenant_manager.get_allowed_models_dict(request)
+    context = {"madmin": mdd}
+    tenant_obj = tenant_manager.resolve_tenant(request)
+    if tenant_obj:
+        context["tenant_obj"] = tenant_obj
+        context["store"] = tenant_obj
+        context["active_store"] = tenant_obj
+    return render(request, "s_admin.html", context)
 
 
-def optimize_form_querysets(form, rows=None, max_limit=1000):
+def optimize_form_querysets(form, rows=None, max_limit=1000, request=None):
     """Ensure foreign key field querysets include all used_ids from current rows
     plus a generous set of available choices (up to max_limit) without loading tens of thousands of rows."""
     for field_name, field in form.fields.items():
         if hasattr(field, "queryset") and field.queryset is not None:
             try:
+                field = tenant_manager.scope_form_queryset(request, field, rows=rows, max_limit=max_limit)
+
                 used_ids = set()
                 if rows:
                     col_name = field_name + "_id"
@@ -232,21 +232,35 @@ def optimize_form_querysets(form, rows=None, max_limit=1000):
 
 @login_required
 def model(request, app, mdl, dat=None, rd_only=None):
-    if not (request.user.is_superuser or getattr(request.user, "is_admin", False)):
+    if not tenant_manager.is_authorized(request):
         return HttpResponseForbidden("Access restricted to administrators.")
     assert isinstance(request, HttpRequest)
+
+    if not tenant_manager.is_model_allowed(request, app, mdl):
+        return HttpResponseForbidden(f"Access to model '{app}.{mdl}' is restricted.")
+
     if request.method == "POST":
         return mdl_post(request, app, mdl)
     dat = json.loads(dat) if dat else {}
-    data = getData(app, mdl, dat)
+    data = getData(app, mdl, dat, request=request)
     if dat:
         data["rows"] = json.loads(json.dumps(data["rows"], default=str))
         return JsonResponse(data)
     rows_list = data["rows"]
     data["rows"] = json.dumps(rows_list, default=str)
     mdl_cls = apps.get_model(app, mdl)
-    data["mdl_form"] = optimize_form_querysets(modelform_factory(mdl_cls, exclude=("id",))(mdl_cls()), rows=rows_list)
+    data["mdl_form"] = optimize_form_querysets(
+        modelform_factory(mdl_cls, exclude=("id",))(mdl_cls()),
+        rows=rows_list,
+        request=request,
+    )
     data["rd_only"] = [] if rd_only == None else rd_only
+
+    tenant_obj = tenant_manager.resolve_tenant(request)
+    if tenant_obj:
+        data["tenant_obj"] = tenant_obj
+        data["store"] = tenant_obj
+        data["active_store"] = tenant_obj
 
     is_ajax = (
         request.headers.get("x-requested-with") == "XMLHttpRequest"
@@ -254,15 +268,7 @@ def model(request, app, mdl, dat=None, rd_only=None):
         or request.GET.get("ajax") == "1"
     )
     if not is_ajax:
-        mdd = {}
-        for m in apps.get_models():
-            lbl = m._meta.app_label
-            if lbl in ["admin", "contenttypes", "sessions"]:
-                continue
-            if lbl not in mdd:
-                mdd[lbl] = []
-            mdd[lbl].append(m.__name__)
-        data["madmin"] = {k: sorted(v) for k, v in sorted(mdd.items())}
+        data["madmin"] = tenant_manager.get_allowed_models_dict(request)
         data["default"] = True
         data["sel_app"] = app
         data["sel_mdl"] = mdl_cls.__name__
@@ -316,13 +322,16 @@ def mdlData(app, mdl, dat):
     return data
 
 
-def getData(app, mdl, req):
+def getData(app, mdl, req, request=None):
     m = apps.get_model(app, mdl)
     ordr = req["order_by"] if "order_by" in req else (m._meta.ordering[0] if m._meta.ordering else "-id")
     excl = req["exclude"] if "exclude" in req else {}
     rpp = req["rows_pp"] if "rows_pp" in req else 40
     pg = req["page_num"] if "page_num" in req else 1
     fltr = {k: True if v == "true" else v for k, v in req["filter"].items()} if "filter" in req else {}
+
+    # Multi-tenant row-level filtering via TenantManager
+    fltr = tenant_manager.scope_query_filter(request, m, fltr)
 
     def get_filter_q(k, v):
         if v == "":
@@ -419,8 +428,13 @@ def mdl_post(request, app, mdl):
     try:
         records = json.loads(request.POST["record_list"])
         mdl = apps.get_model(app, mdl)
+
         kys = [key for key in records.keys() if key.isdigit()]
         for mod_del in mdl.objects.filter(pk__in=kys):
+            # Tenant isolation: ensure user cannot edit records of other stores
+            if not tenant_manager.validate_and_stamp_instance(request, mod_del, is_created=False):
+                continue
+
             val = records[str(mod_del.pk)]
             if not val:
                 mod_del.delete()
@@ -486,6 +500,10 @@ def mdl_post(request, app, mdl):
             if new.__class__.__name__ == "User" and not val["password"].startswith("pbkdf2_sha256"):
                 new.set_password(val["password"])
                 new.is_superuser = False
+
+            # Auto-stamp tenant foreign key for newly created records via TenantManager
+            tenant_manager.validate_and_stamp_instance(request, new, is_created=True)
+
             new.save()
     except Exception as e:
         ret = f"Error {app}.{mdl}:{e}"

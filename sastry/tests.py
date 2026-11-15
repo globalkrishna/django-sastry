@@ -86,3 +86,66 @@ class SastryApiTests(TestCase):
         request.user = self.admin_user
         response = er_schema_api(request, "nonexistent", "FakeModel")
         self.assertEqual(response.status_code, 404)
+
+
+class SastryTenantTests(SimpleTestCase):
+    """Test Multi-Tenant Engine isolation, access control, and query scoping."""
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        User = get_user_model()
+        self.regular_user = User(username="staff_user", is_superuser=False)
+        self.super_user = User(username="super_user", is_superuser=True)
+
+    def test_tenant_manager_disabled_by_default(self):
+        from sastry.tenant import TenantManager
+        tm = TenantManager()
+        # Without SASTRY_MULTI_TENANT['ENABLED'] = True, should operate in standard mode
+        request = self.factory.get("/sastry/")
+        request.user = self.super_user
+        self.assertTrue(tm.is_authorized(request))
+
+    def test_tenant_model_whitelist_filtering(self):
+        from sastry.tenant import TenantManager
+        tm = TenantManager()
+        tm.enabled = True
+        tm.allowed_models = {"auth": ["User"]}
+        tm.excluded_models = {"sessions.*", "admin.*"}
+
+        request = self.factory.get("/sastry/")
+        request.user = self.regular_user
+
+        self.assertTrue(tm.is_model_allowed(request, "auth", "User"))
+        self.assertFalse(tm.is_model_allowed(request, "auth", "Group"))
+        self.assertFalse(tm.is_model_allowed(request, "sessions", "Session"))
+
+        # Superuser bypasses model whitelist
+        request.user = self.super_user
+        self.assertTrue(tm.is_model_allowed(request, "sessions", "Session"))
+
+    def test_scope_query_filter_injection(self):
+        from sastry.tenant import TenantManager
+        tm = TenantManager()
+        tm.enabled = True
+        tm.model_fields = ["store", "tenant"]
+
+        class DummyTenant:
+            id = 42
+
+        request = self.factory.get("/sastry/")
+        request.user = self.regular_user
+        request.store = DummyTenant()
+
+        # Dummy model mock with 'store' field
+        class DummyField:
+            def __init__(self, name):
+                self.name = name
+
+        class DummyModel:
+            class _meta:
+                fields = [DummyField("id"), DummyField("name"), DummyField("store")]
+
+        filter_dict = tm.scope_query_filter(request, DummyModel, {"is_active": True})
+        self.assertEqual(filter_dict.get("store_id"), 42)
+        self.assertEqual(filter_dict.get("is_active"), True)
+

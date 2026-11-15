@@ -526,20 +526,100 @@ By default, `#ShowExtraDetail` is hidden (`d-none`). To display your custom acti
 
 ---
 
-## 6. Security & Access Control
+## 6. Multi-Tenant SaaS Architecture & Row-Level Isolation
 
-Access to Sastry endpoints is restricted at the view level using `@login_required` and administrator permission checks:
+In multi-tenant SaaS environments (such as retail POS networks, franchise ERPs, multi-company accounting, or school systems), exposing Django's monolithic `/admin/` portal to individual store managers or franchise operators is a critical security risk.
 
-```python
-if not (request.user.is_superuser or getattr(request.user, "is_admin", False)):
-    return HttpResponseForbidden("Access restricted to administrators.")
-```
-
-For customer-facing or staff-facing ERP views, you can apply standard Django permissions (e.g., `@login_required`, `request.user.is_staff`, or custom permission mixins) while continuing to use Sastry's data grid and template components.
+`django-sastry` features a native, zero-boilerplate **Multi-Tenant Engine (`sastry.tenant.TenantManager`)** that provides automatic row-level query scoping, model whitelisting, foreign key choice scoping, and auto-stamping of tenant foreign keys on creation.
 
 ---
 
-## 7. API Reference
+### The Problem & Sastry Solution
+
+| Challenge in SaaS | Django Admin (`/admin/`) | `django-sastry` Native Multi-Tenancy |
+| :--- | :--- | :--- |
+| **Monolithic Superadmin** | Monolithic interface requiring superuser privileges. | **Role-Based Isolation**: Tenant staff only see permitted business models (`inventory`, `billing`). |
+| **Row-Level Leakage** | Displays records across all stores/companies globally. | **Automatic Row Scoping**: Queries automatically filter by `store_id = request.store.id`. |
+| **System Model Exposure** | Exposes system tables (`Tenant`, `User`, `Session`). | **Model Blacklisting**: Excluded models return `403 Forbidden` and are omitted from menus. |
+| **Record Creation Drift** | Cashiers must manually select their store from a dropdown. | **Auto-Stamping**: Newly created records are automatically stamped with `new.store = request.store`. |
+| **Foreign Key Isolation** | Dropdowns show suppliers/customers across all tenants. | **Choice Scoping**: Foreign key `<select>` fields only display choices belonging to the active tenant. |
+| **Schema Exploration** | No built-in visual ER schema tool for tenants. | **Scoped ER Diagram**: `/sastry/er/` visualizes entity relationships strictly for permitted tenant models. |
+
+---
+
+### Enabling Native Multi-Tenancy (`settings.py`)
+
+To enable native multi-tenancy in any Django project, add the `SASTRY_MULTI_TENANT` dictionary to your `settings.py`:
+
+```python
+# settings.py
+SASTRY_MULTI_TENANT = {
+    # 1. Enable the multi-tenant engine
+    "ENABLED": True,
+
+    # 2. Attributes on the HTTP request object that identify the active tenant (checked in order)
+    "TENANT_REQUEST_ATTRS": ["store", "tenant", "organization", "company"],
+
+    # 3. Model foreign key field names representing tenant ownership
+    "TENANT_MODEL_FIELDS": ["store", "tenant", "organization", "company"],
+
+    # 4. Access permission mode:
+    #    - 'staff_with_tenant': Allows authenticated staff users with an active tenant context
+    #    - 'superuser_only': Restricts access strictly to superusers
+    #    - Or provide an importable callable string: "myapp.auth.check_tenant_access"
+    "PERMISSION_MODE": "staff_with_tenant",
+
+    # 5. Model Whitelist: Specify accessible apps and models for tenant users
+    #    (Superusers retain unrestricted access to all models)
+    "ALLOWED_MODELS": {
+        "inventory": ["PurchaseOrder", "Vendor", "Purchase", "DebitNote", "StockAudit", "StoreInventory"],
+        "billing": ["Customer", "SalesPerson", "CounterSession", "Invoice"],
+        "catalog": ["Product", "ProductVariant", "HSNCode", "ProductDesignImage"],
+        "acc": ["AccountHead", "Voucher", "LedgerEntry"],
+    },
+
+    # 6. Model Blacklist: Always hide system & infrastructure models from non-superusers
+    "EXCLUDED_MODELS": [
+        "admin.*", "sessions.*", "contenttypes.*", "auth.Permission", 
+        "tenants.Tenant", "tenants.Store"
+    ],
+
+    # 7. Auto-assign tenant foreign keys on newly created records
+    "AUTO_STAMP_ON_CREATE": True,
+}
+```
+
+> [!NOTE]
+> **Zero Overhead When Disabled**:
+> If `SASTRY_MULTI_TENANT` is omitted or `ENABLED: False`, `django-sastry` operates in **100% backward-compatible classic mode** with zero performance impact.
+
+---
+
+### How the Engine Works Under the Hood
+
+1. **Identity Resolution**: On every request, `TenantManager.resolve_tenant(request)` inspects `request.store` (or `request.tenant`).
+2. **Row-Level Filtering in `getData`**:
+   Before querying the database, Sastry introspects the requested model's fields. If the model contains a field listed in `TENANT_MODEL_FIELDS` (e.g. `store`), it automatically appends `{"store_id": request.store.id}` to the query filter. Store 160 will **never** see rows from Store 161.
+3. **Safe Mutations in `mdl_post`**:
+   - **Updates/Deletes**: Validates that `record.store_id == request.store.id`. If a malicious actor tries to edit a row ID belonging to another store, the operation is blocked.
+   - **Creations**: Automatically stamps `instance.store = request.store` before saving.
+4. **Foreign Key Dropdown Scoping**:
+   When rendering form inputs in modal dialogs (`optimize_form_querysets`), related choices (such as Vendors, Customers, or Warehouses) are scoped to the active tenant.
+5. **Interactive ER Diagram Scoping**:
+   When browsing `/sastry/er/`, the schema explorer only diagrams the models whitelisted for that tenant.
+
+---
+
+## 7. Security & Access Control
+
+Access to Sastry endpoints is restricted at the view level using `@login_required` and `TenantManager.is_authorized(request)`:
+
+- **Single-Tenant Mode**: Access is restricted to `request.user.is_superuser` or `request.user.is_admin`.
+- **Multi-Tenant Mode**: Access is dynamically evaluated according to `PERMISSION_MODE` in `SASTRY_MULTI_TENANT` (granting access to store staff operating with an active store context while enforcing row-level security).
+
+---
+
+## 8. API Reference
 
 ### Python Backend Functions (`sastry.dbadmin`)
 
