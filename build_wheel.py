@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
-VERSION = "2.0.1"
+VERSION = "2.0.2"
 PKG_NAME = "django_sastry"
 DIST_DIR = BASE_DIR / "dist"
 DIST_DIR.mkdir(exist_ok=True)

@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.2] - 2026-11-17
+
+### Form Foreign Key Selection Fix
+- **Fixed**:
+  - Removed arbitrary `1,000` item limit on ForeignKey selection querysets (`optimize_form_querysets`), ensuring all available records (e.g. all customers, vendors, accounts) appear in dropdowns without artificial truncation.
+  - When optional limits are configured, ordering defaults to `-pk` to prioritize newest records.
+
+---
+
 ## [2.0.1] - 2026-11-15
 
 ### Documentation & Packaging Refinement
