@@ -271,6 +271,29 @@ export class db_crud {
                     case 'DateTimeField':
                         td.textContent = txt ? txt.slice(0, 10) : '';
                         break;
+                    case 'ManyToManyField':
+                        const m2mLkup = (this.lkup && this.lkup[field[0]]) || null;
+                        let m2mPks = [];
+                        if (Array.isArray(txt)) {
+                            m2mPks = txt;
+                        } else if (typeof txt === 'string' && txt) {
+                            try {
+                                const parsed = JSON.parse(txt);
+                                m2mPks = Array.isArray(parsed) ? parsed : [parsed];
+                            } catch {
+                                m2mPks = txt.split(',').map(s => s.trim()).filter(Boolean);
+                            }
+                        }
+                        td.dataset.val = JSON.stringify(m2mPks);
+                        if (!m2mPks.length) {
+                            td.innerHTML = '<span class="text-muted small">None</span>';
+                        } else if (m2mPks.length <= 2 && m2mLkup) {
+                            td.innerHTML = m2mPks.map(id => `<span class="badge bg-secondary me-1 font-monospace" style="font-size:0.75rem;">${m2mLkup[id] || id}</span>`).join('');
+                        } else {
+                            const titles = m2mLkup ? m2mPks.map(id => m2mLkup[id] || id).join(', ') : `${m2mPks.length} selected`;
+                            td.innerHTML = `<span class="badge bg-primary rounded-pill" title="${titles}" data-bs-toggle="tooltip">${m2mPks.length} selected</span>`;
+                        }
+                        break;
                     default:
                         const baseField = field[0].endsWith('_id') ? field[0].slice(0, -3) : field[0];
                         const genLkup = (this.lkup && (this.lkup[field[0]] || this.lkup[baseField] || this.lkup[`${baseField}_id`])) || null;
@@ -488,6 +511,14 @@ export class db_crud {
                 this.collection[ndx_val][key] = key == 'id' && nr ? `new${ndx_val + 1}` : val;
             }
         });
+        cform.querySelectorAll('.m2m-container').forEach((container) => {
+            const fieldName = container.dataset.m2m;
+            if (fieldName) {
+                const checkedBoxes = Array.from(container.querySelectorAll('.m2m-checkbox:checked'));
+                const selectedPks = checkedBoxes.map(cb => parseInt(cb.value, 10));
+                this.collection[ndx_val][fieldName] = selectedPks;
+            }
+        });
         this.enb_save();
         document.getElementById('setIndex').click();
     }
@@ -637,6 +668,19 @@ export class db_crud {
     }
     setFormData(ndx) {
         Object.entries(this.collection[ndx]).forEach(([key, value]) => {
+            const m2mContainer = document.querySelector(`#cru_form .m2m-container[data-m2m="${key}"]`);
+            if (m2mContainer) {
+                let pks = [];
+                if (Array.isArray(value)) {
+                    pks = value.map(String);
+                } else if (typeof value === 'string' && value) {
+                    try { pks = JSON.parse(value).map(String); } catch { pks = value.split(',').map(s => s.trim()); }
+                }
+                m2mContainer.querySelectorAll('.m2m-checkbox').forEach(cb => {
+                    cb.checked = pks.includes(String(cb.value));
+                });
+                return;
+            }
             let ele = document.querySelector(`#cru_form #${key}`);
             if (!ele && key.endsWith('_id')) {
                 const baseKey = key.slice(0, -3);
@@ -706,6 +750,31 @@ export class db_crud {
             document.querySelector('#cru_form #id').value = `new${this.collection.length}`;
         }
         this.setFormHt('Save');
+        cruForm.querySelectorAll('.m2m-container').forEach((container) => {
+            const searchInput = container.querySelector('.m2m-filter-input');
+            if (searchInput) {
+                searchInput.oninput = () => {
+                    const q = searchInput.value.toLowerCase().trim();
+                    container.querySelectorAll('.m2m-option').forEach((row) => {
+                        row.style.display = (row.textContent || '').toLowerCase().includes(q) ? '' : 'none';
+                    });
+                };
+            }
+            const btnAll = container.querySelector('.m2m-select-all');
+            if (btnAll) {
+                btnAll.onclick = () => {
+                    container.querySelectorAll('.m2m-checkbox').forEach((cb) => {
+                        if (cb.closest('.m2m-option')?.style.display !== 'none') cb.checked = true;
+                    });
+                };
+            }
+            const btnClear = container.querySelector('.m2m-clear-all');
+            if (btnClear) {
+                btnClear.onclick = () => {
+                    container.querySelectorAll('.m2m-checkbox').forEach((cb) => cb.checked = false);
+                };
+            }
+        });
         document.querySelectorAll('input[type="file"]').forEach((input) => input.onchange = (e) => this.imgSave(e));
     }
     setFormHt(which) {
@@ -874,22 +943,104 @@ export class db_crud {
             return false;
         }
         document.getElementById('cru_form').innerHTML = this.form;
-        const ele = document.querySelector(`#cru_form #${this.fields[ndx][0]}`);
+        let ele = document.querySelector(`#cru_form #${this.fields[ndx][0]}`);
+        if (!ele) {
+            ele = document.querySelector(`#cru_form .m2m-container[data-m2m="${this.fields[ndx][0]}"]`);
+        }
         if (this.fields[ndx][1] === 'ImageField') {
             td.classList.add('table-active');
             ele.onchange = (e) => this.imgSave(e);
             ele.click();
             return;
         }
-        const cpy = ele.parentElement.cloneNode(true);
-        cpy.children[1].removeAttribute('id');
-        cpy.children[1].classList.add('fs-5');
+        const cpy = ele && ele.classList.contains('m2m-container') ? ele.cloneNode(true) : (ele?.parentElement?.cloneNode(true) || document.createElement('div'));
+        if (cpy.children[1]) {
+            cpy.children[1].removeAttribute('id');
+            cpy.children[1].classList.add('fs-5');
+        }
         cpy.classList.add('fs-5');
         const f = this.FieldEdit._element;
         f.querySelector('form').innerHTML = cpy.outerHTML;
         f.setAttribute('data-trtd', JSON.stringify([tr.rowIndex, ndx]));
         const [eid, typ] = this.fields[ndx];
         switch (typ) {
+            case 'ManyToManyField':
+                const m2mField = eid;
+                const m2mLkupObj = (this.lkup && this.lkup[m2mField]) || {};
+                let curSelected = [];
+                try {
+                    curSelected = JSON.parse(td.dataset.val || '[]');
+                } catch {
+                    curSelected = td.dataset.val ? [td.dataset.val] : [];
+                }
+                const curSelectedSet = new Set(curSelected.map(String));
+
+                const modalForm = f.querySelector('form');
+                modalForm.innerHTML = `
+                    <div class="m2m-modal-wrapper" data-field="${m2mField}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold"><i class="bi bi-arrows-angle-expand text-primary me-1"></i>${this.fields[ndx][0]}</span>
+                            <div class="d-flex gap-2">
+                                <input type="text" class="form-control form-control-sm m2m-search-input" placeholder="Search..." style="max-width: 180px;">
+                                <button type="button" class="btn btn-sm btn-outline-primary m2m-btn-all">Select All</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary m2m-btn-clear">Clear</button>
+                            </div>
+                        </div>
+                        <div class="m2m-selected-count text-muted small mb-1">
+                            <span class="count-badge fw-bold text-primary">${curSelectedSet.size}</span> selected
+                        </div>
+                        <div class="m2m-modal-list border rounded p-2 bg-white" style="max-height: 320px; overflow-y: auto;">
+                            ${Object.entries(m2mLkupObj).map(([pk, lbl]) => {
+                                const isChecked = curSelectedSet.has(String(pk)) ? 'checked' : '';
+                                return `
+                                    <div class="form-check m2m-row py-1 border-bottom">
+                                        <input class="form-check-input m2m-modal-cb" type="checkbox" name="${m2mField}" id="m2m_cb_${pk}" value="${pk}" data-label="${lbl}" ${isChecked}>
+                                        <label class="form-check-label small" for="m2m_cb_${pk}">${lbl}</label>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+
+                const searchInp = modalForm.querySelector('.m2m-search-input');
+                if (searchInp) {
+                    searchInp.oninput = () => {
+                        const query = searchInp.value.toLowerCase().trim();
+                        modalForm.querySelectorAll('.m2m-row').forEach((row) => {
+                            const text = (row.textContent || '').toLowerCase();
+                            row.style.display = text.includes(query) ? '' : 'none';
+                        });
+                    };
+                }
+                const btnAll = modalForm.querySelector('.m2m-btn-all');
+                const btnClear = modalForm.querySelector('.m2m-btn-clear');
+                const countBadge = modalForm.querySelector('.count-badge');
+                const updateCount = () => {
+                    if (countBadge) {
+                        countBadge.textContent = String(modalForm.querySelectorAll('.m2m-modal-cb:checked').length);
+                    }
+                };
+                if (btnAll) {
+                    btnAll.onclick = () => {
+                        modalForm.querySelectorAll('.m2m-modal-cb').forEach(cb => {
+                            if (cb.closest('.m2m-row')?.style.display !== 'none') {
+                                cb.checked = true;
+                            }
+                        });
+                        updateCount();
+                    };
+                }
+                if (btnClear) {
+                    btnClear.onclick = () => {
+                        modalForm.querySelectorAll('.m2m-modal-cb').forEach(cb => cb.checked = false);
+                        updateCount();
+                    };
+                }
+                modalForm.querySelectorAll('.m2m-modal-cb').forEach((cb) => {
+                    cb.onchange = updateCount;
+                });
+                break;
             case 'JSONField':
                 const textarea = f.querySelector('textarea');
                 textarea.spellcheck = false;
@@ -926,6 +1077,34 @@ export class db_crud {
     }
     cellSave(e) {
         const ndx = document.querySelector('#index tr.table-active');
+        const f = this.FieldEdit._element;
+        const m2mWrapper = f.querySelector('.m2m-modal-wrapper');
+        if (m2mWrapper) {
+            const fieldName = m2mWrapper.dataset.field;
+            const checkedBoxes = Array.from(m2mWrapper.querySelectorAll('.m2m-modal-cb:checked'));
+            const selectedPks = checkedBoxes.map(cb => parseInt(cb.value, 10));
+            
+            const rowNdx = ndx.rowIndex - 1;
+            this.collection[rowNdx][fieldName] = selectedPks;
+            
+            const activeTd = document.querySelector('#index td.table-active');
+            if (activeTd) {
+                activeTd.dataset.val = JSON.stringify(selectedPks);
+                const m2mLkup = (this.lkup && this.lkup[fieldName]) || null;
+                if (!selectedPks.length) {
+                    activeTd.innerHTML = '<span class="text-muted small">None</span>';
+                } else if (selectedPks.length <= 2 && m2mLkup) {
+                    activeTd.innerHTML = selectedPks.map(id => `<span class="badge bg-secondary me-1 font-monospace" style="font-size:0.75rem;">${m2mLkup[id] || id}</span>`).join('');
+                } else {
+                    const titles = m2mLkup ? selectedPks.map(id => m2mLkup[id] || id).join(', ') : `${selectedPks.length} selected`;
+                    activeTd.innerHTML = `<span class="badge bg-primary rounded-pill" title="${titles}" data-bs-toggle="tooltip">${selectedPks.length} selected</span>`;
+                }
+            }
+            this.FieldEdit.hide();
+            this.enb_save();
+            return;
+        }
+
         const formData = new FormData(document.querySelector('#FieldEdit form'));
         let fdt = Object.fromEntries(formData);
         const [key, value] = Object.entries(fdt)[0];

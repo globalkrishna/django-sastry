@@ -279,6 +279,29 @@ export class db_crud<T extends { id?: string | number, [key: string]: any } = an
                     case 'DateTimeField':
                         td.textContent = txt ? txt.slice(0, 10) : '';
                         break;
+                    case 'ManyToManyField':
+                        const m2mLkup = (this.lkup && this.lkup[field[0]]) || null;
+                        let m2mPks: (number | string)[] = [];
+                        if (Array.isArray(txt)) {
+                            m2mPks = txt;
+                        } else if (typeof txt === 'string' && txt) {
+                            try {
+                                const parsed = JSON.parse(txt);
+                                m2mPks = Array.isArray(parsed) ? parsed : [parsed];
+                            } catch {
+                                m2mPks = txt.split(',').map(s => s.trim()).filter(Boolean);
+                            }
+                        }
+                        td.dataset.val = JSON.stringify(m2mPks);
+                        if (!m2mPks.length) {
+                            td.innerHTML = '<span class="text-muted small">None</span>';
+                        } else if (m2mPks.length <= 2 && m2mLkup) {
+                            td.innerHTML = m2mPks.map(id => `<span class="badge bg-secondary me-1 font-monospace" style="font-size:0.75rem;">${m2mLkup[id] || id}</span>`).join('');
+                        } else {
+                            const titles = m2mLkup ? m2mPks.map(id => m2mLkup[id] || id).join(', ') : `${m2mPks.length} selected`;
+                            td.innerHTML = `<span class="badge bg-primary rounded-pill" title="${titles}" data-bs-toggle="tooltip">${m2mPks.length} selected</span>`;
+                        }
+                        break;
                     default:
                         const baseField = field[0].endsWith('_id') ? field[0].slice(0, -3) : field[0];
                         const genLkup = (this.lkup && (this.lkup[field[0]] || this.lkup[baseField] || this.lkup[`${baseField}_id`])) || null;
@@ -491,6 +514,14 @@ export class db_crud<T extends { id?: string | number, [key: string]: any } = an
                 (this.collection[ndx_val] as any)[key] = key == 'id' && nr ? `new${ndx_val + 1}` : val;
             }
         });
+        cform.querySelectorAll('.m2m-container').forEach((container: any) => {
+            const fieldName = container.dataset.m2m;
+            if (fieldName) {
+                const checkedBoxes = Array.from(container.querySelectorAll('.m2m-checkbox:checked')) as HTMLInputElement[];
+                const selectedPks = checkedBoxes.map(cb => parseInt(cb.value, 10));
+                (this.collection[ndx_val] as any)[fieldName] = selectedPks;
+            }
+        });
         this.enb_save();
         document.getElementById('setIndex')!.click();
     }
@@ -638,6 +669,19 @@ export class db_crud<T extends { id?: string | number, [key: string]: any } = an
 
     setFormData(ndx: number) {
         Object.entries(this.collection[ndx] as any).forEach(([key, value]) => {
+            const m2mContainer = document.querySelector(`#cru_form .m2m-container[data-m2m="${key}"]`);
+            if (m2mContainer) {
+                let pks: string[] = [];
+                if (Array.isArray(value)) {
+                    pks = value.map(String);
+                } else if (typeof value === 'string' && value) {
+                    try { pks = JSON.parse(value).map(String); } catch { pks = value.split(',').map(s => s.trim()); }
+                }
+                m2mContainer.querySelectorAll<HTMLInputElement>('.m2m-checkbox').forEach(cb => {
+                    cb.checked = pks.includes(String(cb.value));
+                });
+                return;
+            }
             let ele = document.querySelector(`#cru_form #${key}`) as any;
             if (!ele && key.endsWith('_id')) {
                 const baseKey = key.slice(0, -3);
@@ -705,6 +749,31 @@ export class db_crud<T extends { id?: string | number, [key: string]: any } = an
             (document.querySelector('#cru_form #id') as HTMLInputElement).value = `new${this.collection.length}`;
         }
         this.setFormHt('Save');
+        cruForm.querySelectorAll('.m2m-container').forEach((container: any) => {
+            const searchInput = container.querySelector('.m2m-filter-input') as HTMLInputElement | null;
+            if (searchInput) {
+                searchInput.oninput = () => {
+                    const q = searchInput.value.toLowerCase().trim();
+                    container.querySelectorAll('.m2m-option').forEach((row: HTMLElement) => {
+                        row.style.display = (row.textContent || '').toLowerCase().includes(q) ? '' : 'none';
+                    });
+                };
+            }
+            const btnAll = container.querySelector('.m2m-select-all') as HTMLButtonElement | null;
+            if (btnAll) {
+                btnAll.onclick = () => {
+                    container.querySelectorAll('.m2m-checkbox').forEach((cb: HTMLInputElement) => {
+                        if (cb.closest('.m2m-option')?.style.display !== 'none') cb.checked = true;
+                    });
+                };
+            }
+            const btnClear = container.querySelector('.m2m-clear-all') as HTMLButtonElement | null;
+            if (btnClear) {
+                btnClear.onclick = () => {
+                    container.querySelectorAll('.m2m-checkbox').forEach((cb: HTMLInputElement) => cb.checked = false);
+                };
+            }
+        });
         document.querySelectorAll('input[type="file"]').forEach((input: any) => input.onchange = (e: any) => this.imgSave(e));
     }
 
@@ -871,22 +940,104 @@ export class db_crud<T extends { id?: string | number, [key: string]: any } = an
             return false;
         }
         document.getElementById('cru_form')!.innerHTML = this.form!;
-        const ele = document.querySelector(`#cru_form #${this.fields[ndx][0]}`) as HTMLElement;
+        let ele = document.querySelector(`#cru_form #${this.fields[ndx][0]}`) as HTMLElement | null;
+        if (!ele) {
+            ele = document.querySelector(`#cru_form .m2m-container[data-m2m="${this.fields[ndx][0]}"]`) as HTMLElement | null;
+        }
         if (this.fields[ndx][1] === 'ImageField') {
             td.classList.add('table-active');
-            ele.onchange = (e: any) => this.imgSave(e);
-            ele.click();
+            ele!.onchange = (e: any) => this.imgSave(e);
+            ele!.click();
             return;
         }
-        const cpy = ele.parentElement!.cloneNode(true) as HTMLElement;
-        cpy.children[1].removeAttribute('id');
-        cpy.children[1].classList.add('fs-5');
+        const cpy = ele && ele.classList.contains('m2m-container') ? (ele.cloneNode(true) as HTMLElement) : (ele?.parentElement?.cloneNode(true) as HTMLElement || document.createElement('div'));
+        if (cpy.children[1]) {
+            cpy.children[1].removeAttribute('id');
+            cpy.children[1].classList.add('fs-5');
+        }
         cpy.classList.add('fs-5');
         const f = this.FieldEdit._element;
         f.querySelector('form').innerHTML = cpy.outerHTML;
         f.setAttribute('data-trtd', JSON.stringify([tr.rowIndex, ndx]));
         const [eid, typ] = this.fields[ndx];
         switch (typ) {
+            case 'ManyToManyField':
+                const m2mField = eid;
+                const m2mLkupObj = (this.lkup && this.lkup[m2mField]) || {};
+                let curSelected: (string | number)[] = [];
+                try {
+                    curSelected = JSON.parse(td.dataset.val || '[]');
+                } catch {
+                    curSelected = td.dataset.val ? [td.dataset.val] : [];
+                }
+                const curSelectedSet = new Set(curSelected.map(String));
+
+                const modalForm = f.querySelector('form')!;
+                modalForm.innerHTML = `
+                    <div class="m2m-modal-wrapper" data-field="${m2mField}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold"><i class="bi bi-arrows-angle-expand text-primary me-1"></i>${this.fields[ndx][0]}</span>
+                            <div class="d-flex gap-2">
+                                <input type="text" class="form-control form-control-sm m2m-search-input" placeholder="Search..." style="max-width: 180px;">
+                                <button type="button" class="btn btn-sm btn-outline-primary m2m-btn-all">Select All</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary m2m-btn-clear">Clear</button>
+                            </div>
+                        </div>
+                        <div class="m2m-selected-count text-muted small mb-1">
+                            <span class="count-badge fw-bold text-primary">${curSelectedSet.size}</span> selected
+                        </div>
+                        <div class="m2m-modal-list border rounded p-2 bg-white" style="max-height: 320px; overflow-y: auto;">
+                            ${Object.entries(m2mLkupObj).map(([pk, lbl]) => {
+                                const isChecked = curSelectedSet.has(String(pk)) ? 'checked' : '';
+                                return `
+                                    <div class="form-check m2m-row py-1 border-bottom">
+                                        <input class="form-check-input m2m-modal-cb" type="checkbox" name="${m2mField}" id="m2m_cb_${pk}" value="${pk}" data-label="${lbl}" ${isChecked}>
+                                        <label class="form-check-label small" for="m2m_cb_${pk}">${lbl}</label>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+
+                const searchInp = modalForm.querySelector('.m2m-search-input') as HTMLInputElement | null;
+                if (searchInp) {
+                    searchInp.oninput = () => {
+                        const query = searchInp.value.toLowerCase().trim();
+                        modalForm.querySelectorAll('.m2m-row').forEach((row: any) => {
+                            const text = (row.textContent || '').toLowerCase();
+                            row.style.display = text.includes(query) ? '' : 'none';
+                        });
+                    };
+                }
+                const btnAll = modalForm.querySelector('.m2m-btn-all') as HTMLButtonElement | null;
+                const btnClear = modalForm.querySelector('.m2m-btn-clear') as HTMLButtonElement | null;
+                const countBadge = modalForm.querySelector('.count-badge') as HTMLElement | null;
+                const updateCount = () => {
+                    if (countBadge) {
+                        countBadge.textContent = String(modalForm.querySelectorAll('.m2m-modal-cb:checked').length);
+                    }
+                };
+                if (btnAll) {
+                    btnAll.onclick = () => {
+                        modalForm.querySelectorAll<HTMLInputElement>('.m2m-modal-cb').forEach(cb => {
+                            if (cb.closest('.m2m-row')?.style.display !== 'none') {
+                                cb.checked = true;
+                            }
+                        });
+                        updateCount();
+                    };
+                }
+                if (btnClear) {
+                    btnClear.onclick = () => {
+                        modalForm.querySelectorAll<HTMLInputElement>('.m2m-modal-cb').forEach(cb => cb.checked = false);
+                        updateCount();
+                    };
+                }
+                modalForm.querySelectorAll('.m2m-modal-cb').forEach((cb: any) => {
+                    cb.onchange = updateCount;
+                });
+                break;
             case 'JSONField':
                 const textarea = f.querySelector('textarea');
                 textarea.spellcheck = false;
@@ -924,6 +1075,34 @@ export class db_crud<T extends { id?: string | number, [key: string]: any } = an
 
     cellSave(e: any) {
         const ndx = document.querySelector('#index tr.table-active') as HTMLTableRowElement;
+        const f = this.FieldEdit._element;
+        const m2mWrapper = f.querySelector('.m2m-modal-wrapper') as HTMLElement | null;
+        if (m2mWrapper) {
+            const fieldName = m2mWrapper.dataset.field!;
+            const checkedBoxes = Array.from(m2mWrapper.querySelectorAll<HTMLInputElement>('.m2m-modal-cb:checked'));
+            const selectedPks = checkedBoxes.map(cb => parseInt(cb.value, 10));
+            
+            const rowNdx = ndx.rowIndex - 1;
+            (this.collection[rowNdx] as any)[fieldName] = selectedPks;
+            
+            const activeTd = document.querySelector('#index td.table-active') as HTMLElement;
+            if (activeTd) {
+                activeTd.dataset.val = JSON.stringify(selectedPks);
+                const m2mLkup = (this.lkup && this.lkup[fieldName]) || null;
+                if (!selectedPks.length) {
+                    activeTd.innerHTML = '<span class="text-muted small">None</span>';
+                } else if (selectedPks.length <= 2 && m2mLkup) {
+                    activeTd.innerHTML = selectedPks.map(id => `<span class="badge bg-secondary me-1 font-monospace" style="font-size:0.75rem;">${m2mLkup[id] || id}</span>`).join('');
+                } else {
+                    const titles = m2mLkup ? selectedPks.map(id => m2mLkup[id] || id).join(', ') : `${selectedPks.length} selected`;
+                    activeTd.innerHTML = `<span class="badge bg-primary rounded-pill" title="${titles}" data-bs-toggle="tooltip">${selectedPks.length} selected</span>`;
+                }
+            }
+            this.FieldEdit!.hide();
+            this.enb_save();
+            return;
+        }
+
         const formData = new FormData(document.querySelector('#FieldEdit form') as HTMLFormElement);
         let fdt = Object.fromEntries(formData as any);
         const [key, value] = Object.entries(fdt)[0];

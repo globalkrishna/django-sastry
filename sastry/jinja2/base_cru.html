@@ -35,16 +35,43 @@
   <textarea class="form-control" id="{{k}}" name="{{k}}" {% if v.required%} required
     {%endif%}>{% if mdl.data[k] %}{{ mdl.data[k] }}{% endif %}</textarea>
   {% elif typ == 'select' %}
+  {% if v.__class__.__name__ == 'ModelMultipleChoiceField' %}
+  <div class="m2m-container flex-grow-1 p-2 border rounded bg-light" data-m2m="{{k}}">
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <small class="text-muted fw-bold"><i class="bi bi-check2-square text-primary me-1"></i>Multi-Select</small>
+      <div class="d-flex gap-1">
+        <input type="text" class="form-control form-control-sm m2m-filter-input py-0 px-2" placeholder="Search..." style="max-width: 150px; font-size: 0.8rem;">
+        <button type="button" class="btn btn-sm btn-outline-primary py-0 px-1 m2m-select-all" style="font-size: 0.75rem;">All</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1 m2m-clear-all" style="font-size: 0.75rem;">None</button>
+      </div>
+    </div>
+    <div class="m2m-options-box border rounded bg-white p-2" style="max-height: 180px; overflow-y: auto;">
+      {% for vl in v.choices | sort(attribute=1) %}
+      <div class="form-check m2m-option py-0 mb-1">
+        <input class="form-check-input m2m-checkbox" type="checkbox" name="{{k}}" id="{{k}}_{{vl[0]}}" value="{{vl[0]}}" data-label="{{vl[1]}}"
+          {% if mdl.data[k] and vl[0] in mdl.data[k] %} checked{% endif %}>
+        <label class="form-check-label small" for="{{k}}_{{vl[0]}}">{{vl[1]}}</label>
+      </div>
+      {% endfor %}
+    </div>
+    <datalist id="FK{{k}}">
+      {% for vl in v.choices | sort(attribute=1) %}
+      <option value="{{vl[1]}}" data-pk="{{vl[0]}}">
+      {% endfor %}
+    </datalist>
+  </div>
+  {% else %}
   {% set kid = k+'_id' if v.__class__.__name__ =='ModelChoiceField' else k %}
   {# FK needed in name to put back id instead of name value of foreign key #}
   <input list="FK{{kid}}" class="form-control" id="{{kid}}" name="FK{{kid}}" autocomplete="off"
-    value="{{mdl.data[k] if v.__class__.__name__ != 'ModelMultipleChoiceField' and mdl.data[k] else ''}}"
+    value="{{mdl.data[k] if mdl.data[k] else ''}}"
     data-cls={{v.__class__.__name__}} />
   <datalist id="FK{{kid}}">
     {% for vl in v.choices | sort(attribute=1) %}
     <option value="{{vl[1]}}" data-pk="{{vl[0]}}">
       {% endfor %}
   </datalist>
+  {% endif %}
   {% elif 'color' in k and typ != 'number' and not k.endswith('_qty') and not k.startswith('n_colors') and (mdl.data[k] is string or not mdl.data[k]) %}
   {% set clr = '' %}
   {% if not mdl.data[k] %}

@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.3] - 2026-11-18
+
+### ManyToMany Multi-Selection & Permission Management
+- **Added**:
+  - Full `ManyToManyField` support in Sastry Dynamic CRUD:
+    - Searchable multi-selection UI with live text filtering, "Select All", and "Clear" controls.
+    - Inline badge pills displaying selected items with compact count badges for large collections.
+    - Single-cell modal editing for ManyToMany fields with live count badges and interactive checkboxes.
+    - Pre-fetching (`prefetch_related`) on queries to prevent N+1 queries when loading multi-select rows.
+    - Automatic `set()` synchronization on POST updates and new instance creation.
+    - Full support for `auth.Group.permissions` and related M2M relations across Django models.
+  - Interactive ER Diagram cards now display `ManyToManyField` with distinct badges and connecting relations.
+
+---
+
 ## [2.0.2] - 2026-11-17
 
 ### Form Foreign Key Selection Fix

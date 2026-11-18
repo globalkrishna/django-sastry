@@ -39,6 +39,14 @@ class SastryIntrospectionTests(SimpleTestCase):
         self.assertIn("id", lvt["FieldSeq"])
         self.assertEqual(lvt["id"]["ColumnType"], "PrimaryKey")
 
+    def test_get_model_relations_data_many_to_many(self):
+        from django.contrib.auth.models import Group
+        data = get_model_relations_data("auth", "Group")
+        lvt = data["lvt"]
+        self.assertIn("permissions", lvt["FieldSeq"])
+        self.assertEqual(lvt["permissions"]["ColumnType"], "ManyToManyField")
+        self.assertEqual(lvt["permissions"]["kind"], "auth.Permission")
+
     def test_get_model_table_prop(self):
         prop = get_model_table_prop(ContentType)
         self.assertIn("FieldSeq", prop)
@@ -148,4 +156,80 @@ class SastryTenantTests(SimpleTestCase):
         filter_dict = tm.scope_query_filter(request, DummyModel, {"is_active": True})
         self.assertEqual(filter_dict.get("store_id"), 42)
         self.assertEqual(filter_dict.get("is_active"), True)
+
+
+class SastryManyToManyTests(TestCase):
+    """Test ManyToMany field serialization, retrieval, and persistence."""
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        User = get_user_model()
+        self.admin_user = User.objects.create_superuser(
+            username="m2m_admin",
+            email="m2m@example.com",
+            password="testpassword123",
+        )
+        from django.contrib.auth.models import Group, Permission
+        self.group = Group.objects.create(name="Editors")
+        self.perms = list(Permission.objects.all()[:3])
+        self.group.permissions.set(self.perms)
+
+    def test_mdlDict_serializes_many_to_many(self):
+        from sastry.dbadmin import mdlDict
+        data = mdlDict(self.group)
+        self.assertIn("permissions", data)
+        self.assertIsInstance(data["permissions"], list)
+        expected_pks = [p.pk for p in self.perms]
+        self.assertEqual(sorted(data["permissions"]), sorted(expected_pks))
+
+    def test_mdl_post_updates_many_to_many(self):
+        from sastry.dbadmin import mdl_post
+        from django.contrib.auth.models import Permission
+
+        new_perms = list(Permission.objects.all()[3:5])
+        new_perm_pks = [p.pk for p in new_perms]
+
+        payload = {
+            str(self.group.pk): {
+                "name": "Super Editors",
+                "permissions": new_perm_pks,
+            }
+        }
+        request = self.factory.post(
+            "/sastry/auth/Group/",
+            {"record_list": json.dumps(payload)},
+        )
+        request.user = self.admin_user
+        response = mdl_post(request, "auth", "Group")
+        self.assertEqual(response.status_code, 200)
+
+        self.group.refresh_from_db()
+        self.assertEqual(self.group.name, "Super Editors")
+        current_perms = list(self.group.permissions.values_list("pk", flat=True))
+        self.assertEqual(sorted(current_perms), sorted(new_perm_pks))
+
+    def test_mdl_post_creates_with_many_to_many(self):
+        from sastry.dbadmin import mdl_post
+        from django.contrib.auth.models import Group, Permission
+
+        test_perms = list(Permission.objects.all()[:2])
+        test_perm_pks = [p.pk for p in test_perms]
+
+        payload = {
+            "new1": {
+                "name": "Reviewers",
+                "permissions": test_perm_pks,
+            }
+        }
+        request = self.factory.post(
+            "/sastry/auth/Group/",
+            {"record_list": json.dumps(payload)},
+        )
+        request.user = self.admin_user
+        response = mdl_post(request, "auth", "Group")
+        self.assertEqual(response.status_code, 200)
+
+        created_group = Group.objects.get(name="Reviewers")
+        assigned_perms = list(created_group.permissions.values_list("pk", flat=True))
+        self.assertEqual(sorted(assigned_perms), sorted(test_perm_pks))
 

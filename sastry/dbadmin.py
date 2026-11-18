@@ -79,6 +79,10 @@ def get_model_table_prop(model_cls):
         if f.is_relation and f.related_model:
             kind = f.related_model._meta.label
         prop[f.name] = (col_type, kind)
+    for f in model_cls._meta.many_to_many:
+        seq.append(f.name)
+        kind = f.related_model._meta.label if f.related_model else None
+        prop[f.name] = ("ManyToManyField", kind)
     return prop
 
 
@@ -114,6 +118,27 @@ def get_model_relations_data(app_label, model_name):
             "internal_type": f.get_internal_type(),
         }
         if f.is_relation and f.related_model:
+            target_cls = f.related_model
+            target_key = target_cls._meta.label
+            f_info["kind"] = target_key
+            if target_key not in foreign and target_key != main_key:
+                foreign[target_key] = get_model_table_prop(target_cls)
+        lvt[fname] = f_info
+
+    for f in mdl._meta.many_to_many:
+        fname = f.name
+        lvt["FieldSeq"].append(fname)
+        f_info = {
+            "ColumnType": "ManyToManyField",
+            "lbl": str(f.verbose_name or fname),
+            "null": True,
+            "blank": bool(f.blank),
+            "editable": bool(f.editable),
+            "unique": False,
+            "dbindex": False,
+            "internal_type": "ManyToManyField",
+        }
+        if f.related_model:
             target_cls = f.related_model
             target_key = target_cls._meta.label
             f_info["kind"] = target_key
@@ -383,6 +408,12 @@ def getData(app, mdl, req, request=None):
             ml = ml.select_related(req["related"][0])
         except Exception:
             pass
+    m2m_names = [f.name for f in m._meta.many_to_many]
+    if m2m_names:
+        try:
+            ml = ml.prefetch_related(*m2m_names)
+        except Exception:
+            pass
     if excl:
         ml = ml.exclude(**excl)
     if ordr:
@@ -465,10 +496,21 @@ def mdl_post(request, app, mdl):
                         setattr(mod_del, k.column, k.get_default())
             if hasattr(mod_del, "modified_by_id") and request.user.is_authenticated:
                 mod_del.modified_by_id = request.user.id
-            if mod_del.__class__.__name__ == "User" and not val["password"].startswith("pbkdf2_sha256"):
+            if mod_del.__class__.__name__ == "User" and not val.get("password", "").startswith("pbkdf2_sha256"):
                 mod_del.set_password(val["password"])
                 mod_del.is_superuser = False
             mod_del.save()
+            for m2m in mdl._meta.many_to_many:
+                if m2m.name in val:
+                    raw_m2m = val[m2m.name]
+                    if isinstance(raw_m2m, str):
+                        try:
+                            raw_m2m = json.loads(raw_m2m)
+                        except Exception:
+                            raw_m2m = [x.strip() for x in raw_m2m.split(",") if x.strip()]
+                    if isinstance(raw_m2m, list):
+                        pks = [int(x) for x in raw_m2m if str(x).isdigit()]
+                        getattr(mod_del, m2m.name).set(pks)
         for create in [key for key in records.keys() if not key.isdigit()]:
             val = records[create]
             if not val:
@@ -499,7 +541,7 @@ def mdl_post(request, app, mdl):
                     setattr(new, k.column, k.get_default())
             if hasattr(new, "created_by_id") and request.user.is_authenticated:
                 new.created_by_id = request.user.id
-            if new.__class__.__name__ == "User" and not val["password"].startswith("pbkdf2_sha256"):
+            if new.__class__.__name__ == "User" and not val.get("password", "").startswith("pbkdf2_sha256"):
                 new.set_password(val["password"])
                 new.is_superuser = False
 
@@ -507,6 +549,17 @@ def mdl_post(request, app, mdl):
             tenant_manager.validate_and_stamp_instance(request, new, is_created=True)
 
             new.save()
+            for m2m in mdl._meta.many_to_many:
+                if m2m.name in val:
+                    raw_m2m = val[m2m.name]
+                    if isinstance(raw_m2m, str):
+                        try:
+                            raw_m2m = json.loads(raw_m2m)
+                        except Exception:
+                            raw_m2m = [x.strip() for x in raw_m2m.split(",") if x.strip()]
+                    if isinstance(raw_m2m, list):
+                        pks = [int(x) for x in raw_m2m if str(x).isdigit()]
+                        getattr(new, m2m.name).set(pks)
     except Exception as e:
         ret = f"Error {app}.{mdl}:{e}"
     return HttpResponse(ret)
@@ -533,6 +586,11 @@ def mdlDict(mdl):
             elif cn == "FieldFile":
                 v = v.url if v.name else "Invalid File"
         mdat[k.attname] = v
+    for m2m in mdl._meta.many_to_many:
+        try:
+            mdat[m2m.name] = list(getattr(mdl, m2m.name).values_list("pk", flat=True))
+        except Exception:
+            mdat[m2m.name] = []
     if hasattr(mdl, "item_list") and "item_list" not in mdat:
         mdat["item_list"] = mdl.item_list
     return mdat
@@ -766,6 +824,11 @@ def SaveModel(mdl, request):
     try:
         setFields(mdl, request)
         mdl.save()
+        for m2m in mdl._meta.many_to_many:
+            if m2m.name in request.POST:
+                pks = request.POST.getlist(m2m.name)
+                pks = [int(x) for x in pks if str(x).isdigit()]
+                getattr(mdl, m2m.name).set(pks)
         return None
     except (IntegrityError, Exception) as e:
         return "Error " + str(e)
