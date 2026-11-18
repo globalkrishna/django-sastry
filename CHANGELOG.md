@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.6] - 2026-11-18
+
+### Dark Mode Modal Styling for ManyToMany
+- **Improved**:
+  - Restyled ManyToMany modal and inline multi-select containers to seamlessly adhere to dark mode (`[data-bs-theme="dark"]`).
+  - Replaced hardcoded white background containers with theme-adaptive styling (`#111418` dark slate) and high-contrast labels (`#e6edf3`).
+  - Added subtle hover highlights (`#212730`), active checked state highlights, and clickable option rows.
+  - Enhanced search input and modal dialog border contrast.
+
+---
+
 ## [2.0.5] - 2026-11-18
 
 ### Unsaved Instance ManyToMany Access Fix

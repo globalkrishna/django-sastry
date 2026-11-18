@@ -762,15 +762,16 @@ export class db_crud<T extends { id?: string | number, [key: string]: any } = an
             const btnAll = container.querySelector('.m2m-select-all') as HTMLButtonElement | null;
             if (btnAll) {
                 btnAll.onclick = () => {
-                    container.querySelectorAll('.m2m-checkbox').forEach((cb: HTMLInputElement) => {
-                        if (cb.closest('.m2m-option')?.style.display !== 'none') cb.checked = true;
+                    container.querySelectorAll('.m2m-checkbox').forEach((cb: any) => {
+                        const opt = cb.closest('.m2m-option') as HTMLElement | null;
+                        if (!opt || opt.style.display !== 'none') cb.checked = true;
                     });
                 };
             }
             const btnClear = container.querySelector('.m2m-clear-all') as HTMLButtonElement | null;
             if (btnClear) {
                 btnClear.onclick = () => {
-                    container.querySelectorAll('.m2m-checkbox').forEach((cb: HTMLInputElement) => cb.checked = false);
+                    container.querySelectorAll('.m2m-checkbox').forEach((cb: any) => cb.checked = false);
                 };
             }
         });
@@ -986,11 +987,11 @@ export class db_crud<T extends { id?: string | number, [key: string]: any } = an
                         <div class="m2m-selected-count text-muted small mb-1">
                             <span class="count-badge fw-bold text-primary">${curSelectedSet.size}</span> selected
                         </div>
-                        <div class="m2m-modal-list border rounded p-2 bg-white" style="max-height: 320px; overflow-y: auto;">
+                        <div class="m2m-modal-list border rounded p-2" style="max-height: 320px; overflow-y: auto;">
                             ${Object.entries(m2mLkupObj).map(([pk, lbl]) => {
                                 const isChecked = curSelectedSet.has(String(pk)) ? 'checked' : '';
                                 return `
-                                    <div class="form-check m2m-row py-1 border-bottom">
+                                    <div class="form-check m2m-row py-1">
                                         <input class="form-check-input m2m-modal-cb" type="checkbox" name="${m2mField}" id="m2m_cb_${pk}" value="${pk}" data-label="${lbl}" ${isChecked}>
                                         <label class="form-check-label small" for="m2m_cb_${pk}">${lbl}</label>
                                     </div>
@@ -1020,8 +1021,9 @@ export class db_crud<T extends { id?: string | number, [key: string]: any } = an
                 };
                 if (btnAll) {
                     btnAll.onclick = () => {
-                        modalForm.querySelectorAll<HTMLInputElement>('.m2m-modal-cb').forEach(cb => {
-                            if (cb.closest('.m2m-row')?.style.display !== 'none') {
+                        modalForm.querySelectorAll('.m2m-modal-cb').forEach((cb: any) => {
+                            const row = cb.closest('.m2m-row') as HTMLElement | null;
+                            if (!row || row.style.display !== 'none') {
                                 cb.checked = true;
                             }
                         });
@@ -1030,12 +1032,24 @@ export class db_crud<T extends { id?: string | number, [key: string]: any } = an
                 }
                 if (btnClear) {
                     btnClear.onclick = () => {
-                        modalForm.querySelectorAll<HTMLInputElement>('.m2m-modal-cb').forEach(cb => cb.checked = false);
+                        modalForm.querySelectorAll('.m2m-modal-cb').forEach((cb: any) => cb.checked = false);
                         updateCount();
                     };
                 }
                 modalForm.querySelectorAll('.m2m-modal-cb').forEach((cb: any) => {
                     cb.onchange = updateCount;
+                });
+                modalForm.querySelectorAll('.m2m-row').forEach((row: any) => {
+                    row.onclick = (e: MouseEvent) => {
+                        const tag = (e.target as HTMLElement).tagName;
+                        if (tag !== 'INPUT' && tag !== 'LABEL') {
+                            const cb = row.querySelector('.m2m-modal-cb') as HTMLInputElement | null;
+                            if (cb) {
+                                cb.checked = !cb.checked;
+                                updateCount();
+                            }
+                        }
+                    };
                 });
                 break;
             case 'JSONField':

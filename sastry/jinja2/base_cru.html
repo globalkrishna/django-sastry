@@ -36,7 +36,7 @@
     {%endif%}>{% if mdl.data[k] %}{{ mdl.data[k] }}{% endif %}</textarea>
   {% elif typ == 'select' %}
   {% if v.__class__.__name__ == 'ModelMultipleChoiceField' %}
-  <div class="m2m-container flex-grow-1 p-2 border rounded bg-light" data-m2m="{{k}}">
+  <div class="m2m-container flex-grow-1 p-2 border rounded" data-m2m="{{k}}">
     <div class="d-flex justify-content-between align-items-center mb-1">
       <small class="text-muted fw-bold"><i class="bi bi-check2-square text-primary me-1"></i>Multi-Select</small>
       <div class="d-flex gap-1">
@@ -45,7 +45,7 @@
         <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1 m2m-clear-all" style="font-size: 0.75rem;">None</button>
       </div>
     </div>
-    <div class="m2m-options-box border rounded bg-white p-2" style="max-height: 180px; overflow-y: auto;">
+    <div class="m2m-options-box border rounded p-2" style="max-height: 180px; overflow-y: auto;">
       {% for vl in v.choices | sort(attribute=1) %}
       <div class="form-check m2m-option py-0 mb-1">
         <input class="form-check-input m2m-checkbox" type="checkbox" name="{{k}}" id="{{k}}_{{vl[0]}}" value="{{vl[0]}}" data-label="{{vl[1]}}">
