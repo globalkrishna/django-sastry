@@ -226,29 +226,37 @@ def index(request):
     return render(request, "s_admin.html", context)
 
 
-def optimize_form_querysets(form, rows=None, max_limit=None, request=None):
-    """Ensure foreign key field querysets include all available choices without arbitrary limits."""
+def optimize_form_querysets(form, rows=None, max_limit=None, request=None, safety_threshold=10000):
+    """Ensure foreign key field querysets include all available choices for standard/master models,
+    while protecting against catastrophic memory/DOM crashes on massive transaction tables (> safety_threshold)."""
     for field_name, field in form.fields.items():
         if hasattr(field, "queryset") and field.queryset is not None:
             try:
                 field = tenant_manager.scope_form_queryset(request, field, rows=rows, max_limit=max_limit)
 
-                if max_limit:
-                    used_ids = set()
-                    if rows:
-                        col_name = field_name + "_id"
-                        for r in rows:
-                            val = r.get(col_name) if col_name in r else r.get(field_name)
-                            if val and isinstance(val, (int, str)) and str(val).isdigit():
-                                used_ids.add(int(val))
+                used_ids = set()
+                if rows:
+                    col_name = field_name + "_id"
+                    for r in rows:
+                        val = r.get(col_name) if col_name in r else r.get(field_name)
+                        if val and isinstance(val, (int, str)) and str(val).isdigit():
+                            used_ids.add(int(val))
 
-                    total_count = field.queryset.count()
-                    if total_count > max_limit:
-                        top_ids = list(field.queryset.order_by("-pk").values_list("pk", flat=True)[:max_limit])
-                        combined_ids = set(top_ids) | used_ids
-                        field.queryset = field.queryset.filter(pk__in=combined_ids)
-                    else:
-                        field.queryset = field.queryset.all()
+                target_model = field.queryset.model
+                fk_relations = [f.name for f in target_model._meta.fields if f.is_relation and f.many_to_one]
+                if fk_relations:
+                    try:
+                        field.queryset = field.queryset.select_related(*fk_relations[:3])
+                    except Exception:
+                        pass
+
+                limit = max_limit or safety_threshold
+                total_count = field.queryset.count()
+                if total_count > limit:
+                    top_n = max_limit if max_limit else 200
+                    top_ids = list(field.queryset.order_by("-pk").values_list("pk", flat=True)[:top_n])
+                    combined_ids = set(top_ids) | used_ids
+                    field.queryset = field.queryset.filter(pk__in=combined_ids)
                 else:
                     field.queryset = field.queryset.all()
             except Exception:

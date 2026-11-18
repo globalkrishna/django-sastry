@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.4] - 2026-11-18
+
+### Form Foreign Key Optimization & Crash Protection
+- **Fixed**:
+  - Prevented infinite hang and DOM freezing on models with foreign keys to high-volume transaction tables (e.g. `VoucherItem` with 500k+ rows) when `max_limit=None`.
+  - Introduced a `safety_threshold` (10,000 items) in `optimize_form_querysets`: standard and master models (such as `Customer` with 3,800+ records, `Product`, `Vendor`, etc.) load all choices without truncation, while massive transaction tables safely load `used_ids` plus recent records.
+  - Automatically applied `select_related` on ForeignKey target models to prevent N+1 queries during option label rendering (such as `Customer.__str__` accessing `state.name`).
+
+---
+
 ## [2.0.3] - 2026-11-18
 
 ### ManyToMany Multi-Selection & Permission Management
