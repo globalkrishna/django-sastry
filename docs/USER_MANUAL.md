@@ -61,7 +61,7 @@ In traditional development, engineering teams spend **80% to 90% of their time w
 `django-sastry` serves two complementary roles in modern Django software engineering:
 
 1. **Zero-Configuration Dynamic Admin & Schema Inspector**:
-   Unlike Django's default `django.contrib.admin`—which requires manually registering `admin.ModelAdmin` classes across every app—Sastry dynamically introspects `apps.get_models()` and model `_meta` APIs in memory with zero boilerplate and zero database overhead during schema generation.
+   Sastry dynamically introspects `apps.get_models()` and model `_meta` APIs in memory with zero boilerplate and zero database overhead during schema generation, providing an instant spreadsheet-style data grid and visual ER diagram across all installed models.
 
 2. **Extensible ERP Application Foundation**:
    In complex enterprise systems (such as `erp.saas3.in`), Sastry acts as the unified base application shell:
