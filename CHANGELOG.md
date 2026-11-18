@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.7] - 2026-11-18
+
+### Plain-Text Password Hashing & Superuser Preservation
+- **Added**:
+  - Full support for setting/modifying user passwords via simple plain-text in Sastry Dynamic CRUD for any auth/user model with `set_password`.
+  - Integrated Django's native `identify_hasher` to automatically differentiate between plain-text passwords and pre-hashed passwords (PBKDF2, Argon2, BCrypt, SCrypt), ensuring plain-text is securely hashed while existing hashes are not double-hashed.
+  - Preserves existing `is_superuser` and role flags without unintended demotions.
+
+---
+
 ## [2.0.6] - 2026-11-18
 
 ### Dark Mode Modal Styling for ManyToMany

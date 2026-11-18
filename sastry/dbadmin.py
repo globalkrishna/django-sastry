@@ -504,9 +504,17 @@ def mdl_post(request, app, mdl):
                         setattr(mod_del, k.column, k.get_default())
             if hasattr(mod_del, "modified_by_id") and request.user.is_authenticated:
                 mod_del.modified_by_id = request.user.id
-            if mod_del.__class__.__name__ == "User" and not val.get("password", "").startswith("pbkdf2_sha256"):
-                mod_del.set_password(val["password"])
-                mod_del.is_superuser = False
+            if hasattr(mod_del, "set_password") and val.get("password"):
+                raw_pwd = val["password"]
+                is_hashed = False
+                try:
+                    from django.contrib.auth.hashers import identify_hasher
+                    identify_hasher(raw_pwd)
+                    is_hashed = True
+                except Exception:
+                    is_hashed = str(raw_pwd).startswith(("pbkdf2_", "argon2", "bcrypt", "scrypt"))
+                if not is_hashed:
+                    mod_del.set_password(raw_pwd)
             mod_del.save()
             for m2m in mdl._meta.many_to_many:
                 if m2m.name in val:
@@ -549,9 +557,17 @@ def mdl_post(request, app, mdl):
                     setattr(new, k.column, k.get_default())
             if hasattr(new, "created_by_id") and request.user.is_authenticated:
                 new.created_by_id = request.user.id
-            if new.__class__.__name__ == "User" and not val.get("password", "").startswith("pbkdf2_sha256"):
-                new.set_password(val["password"])
-                new.is_superuser = False
+            if hasattr(new, "set_password") and val.get("password"):
+                raw_pwd = val["password"]
+                is_hashed = False
+                try:
+                    from django.contrib.auth.hashers import identify_hasher
+                    identify_hasher(raw_pwd)
+                    is_hashed = True
+                except Exception:
+                    is_hashed = str(raw_pwd).startswith(("pbkdf2_", "argon2", "bcrypt", "scrypt"))
+                if not is_hashed:
+                    new.set_password(raw_pwd)
 
             # Auto-stamp tenant foreign key for newly created records via TenantManager
             tenant_manager.validate_and_stamp_instance(request, new, is_created=True)
