@@ -18,22 +18,22 @@ This document serves as the canonical audit of feature parity, gaps, and the arc
 
 ## 2. Feature Parity Matrix
 
-| Feature Category | Standard `django.contrib.admin` | `django-sastry` (v2.0.7) | Parity Status | Target in Sastry |
+| Feature Category | Standard `django.contrib.admin` | `django-sastry` (v2.1.0) | Parity Status | Status in Sastry |
 | :--- | :--- | :--- | :--- | :--- |
 | **Inline Grid Editing** | Poor (`list_editable` forces full page reload) | **Native spreadsheet grid** with live multi-cell batch save (`SaveAll`) | 🟢 **Sastry Superpower** | Enhanced |
 | **Model Registration** | Manual boilerplate (`admin.site.register()`) required for all models | **Zero-boilerplate** automatic schema introspection and discovery | 🟢 **Sastry Superpower** | Native |
 | **Schema Visualization** | None (requires external graphviz/extensions) | **Built-in interactive ER diagram** (`erview/`) with zoom, pan, export | 🟢 **Sastry Superpower** | Native |
 | **Password Management** | Complex multi-step change form (`SetPasswordForm`) | **Direct plain-text auto-hashing** with existing hash detection | 🟢 **Sastry Superpower** | Native |
 | **Multi-Tenancy** | Requires custom model managers or complex overrides | **Native tenant manager** built into query and data pipelines | 🟢 **Sastry Superpower** | Native |
-| **Custom Bulk Actions** | `@admin.action` registry with dropdown execution on selected rows | Delete and CSV/JSON export only | 🟡 **Missing** | v2.1.0 |
-| **FK Autocomplete** | Select2 Ajax search (`autocomplete_fields`) for massive tables (1M+ rows) | Dropdown datalist with 10k safety cutoff | 🟡 **Missing** | v2.1.0 |
-| **Read-Only Fields** | `readonly_fields = (...)` displays text/badges, prevents edit | Global editable inputs | 🟡 **Missing** | v2.1.0 |
-| **Master-Detail Inlines** | `TabularInline` & `StackedInline` on parent changeform | Extension detail pattern (`#ShowExtraDetail`), manual templates | 🟠 **Partial** | v2.2.0 |
-| **Date Hierarchy** | `date_hierarchy = 'created_at'` drill-down breadcrumb bar | Manual column filter modal | ⚪ **Nice to have** | v2.2.0 |
-| **Form Fieldsets** | `fieldsets = (...)` with collapsible sections & multi-column rows | Linear vertical field sequence | ⚪ **Nice to have** | v2.2.0 |
-| **Audit Trail** | Built-in `LogEntry` tracks additions, changes, and diffs | None (relies on external app models) | ⚪ **Nice to have** | v2.3.0 |
-| **Granular Permissions** | Object-level & model-level hooks (`has_change_permission`, etc.) | Global authentication / superuser / tenant gates | ⚪ **Nice to have** | v2.3.0 |
-| **Custom List Filters** | `SimpleListFilter` with arbitrary SQL/Q expressions | Column-attribute string/choice filters | ⚪ **Nice to have** | v2.3.0 |
+| **Custom Bulk Actions** | `@admin.action` registry with dropdown execution on selected rows | **Multi-row cell edits + `@sastry_action` toolbar dropdown registry** | 🟢 **Full Parity** | Implemented (v2.1.0) |
+| **FK Autocomplete** | Select2 Ajax search (`autocomplete_fields`) for massive tables (1M+ rows) | **Dynamic Ajax `/sastry/autocomplete/` search with DOM crash protection** | 🟢 **Full Parity** | Implemented (v2.1.0) |
+| **Read-Only Fields** | `readonly_fields = (...)` displays text/badges, prevents edit | **`dat["rd_only"]`, model options, header lock badges & `mdl_post` tampering protection** | 🟢 **Full Parity** | Implemented (v2.1.0) |
+| **Master-Detail Inlines** | `TabularInline` & `StackedInline` on parent changeform | **Dual-Mode Extension Pattern (`ShowTab('ExtraDetail')`)** | 🟢 **Full Parity** | Native |
+| **Date Hierarchy** | `date_hierarchy = 'created_at'` drill-down breadcrumb bar | Column filter modal | ⚪ **Future** | v2.2.0 |
+| **Form Fieldsets** | `fieldsets = (...)` with collapsible sections & multi-column rows | Linear vertical field sequence | ⚪ **Future** | v2.2.0 |
+| **Audit Trail** | Built-in `LogEntry` tracks additions, changes, and diffs | External app model logs | ⚪ **Future** | v2.3.0 |
+| **Granular Permissions** | Object-level & model-level hooks (`has_change_permission`, etc.) | Multi-tenant role whitelisting & auth gates | ⚪ **Future** | v2.3.0 |
+| **Custom List Filters** | `SimpleListFilter` with arbitrary SQL/Q expressions | Column-attribute string/choice filters | ⚪ **Future** | v2.3.0 |
 
 ---
 

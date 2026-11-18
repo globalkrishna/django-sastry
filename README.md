@@ -253,6 +253,72 @@ python manage.py runserver
 
 ---
 
+## Declarative Model Options, Read-Only Fields & Custom Actions
+
+Sastry 2.1 introduces a zero-boilerplate declarative API to configure model behavior, lock read-only fields, register custom toolbar actions, and configure async search without subclassing view controllers.
+
+### 1. In `settings.py` (Centralized Configuration)
+```python
+SASTRY_CONFIG = {
+    "auth.User": {
+        "readonly_fields": ["date_joined", "last_login"],
+        "autocomplete_fields": ["groups"],
+    },
+    "acc.BillPayment": {
+        "readonly_fields": ["created_at", "voucher_no"],
+        "autocomplete_fields": ["voucher_item"],
+    },
+}
+```
+
+### 2. In `models.py` or `admin.py` (Code-Level Registration)
+```python
+from sastry import register_model_options, sastry_action, sastry_options
+
+# Option A: Functional registration
+register_model_options(
+    "customer.Customer",
+    readonly_fields=["vendor_code", "opening_balance"],
+    autocomplete_fields=["parent_account"],
+    search_fields=["name", "city", "phone"],
+)
+
+# Option B: Model class decorator
+@sastry_options(
+    readonly_fields=["created_at"],
+    autocomplete_fields=["supplier"],
+)
+class Order(models.Model):
+    ...
+
+# Custom bulk action for the table toolbar
+@sastry_action(model="customer.Customer", description="Sync to CRM")
+def sync_to_crm(request, queryset):
+    count = queryset.count()
+    # Execute custom business logic across checked rows
+    return {"success": True, "message": f"Successfully queued {count} records for CRM sync."}
+```
+
+### 3. In Custom Master-Detail Views (`mdlData`)
+Pass read-only fields directly in the `dat` dictionary:
+```python
+dat = {
+    "show": ["id", "name", "city", "state_id"],
+    "rd_only": ["state_id"],  # 🔒 Disables cell editing, adds header lock icon, and protects on save
+}
+data = mdlData("customer", "Customer", dat)
+```
+
+---
+
+## Dynamic Autocomplete & Large Table Scalability
+
+For high-volume transaction databases (hundreds of thousands of records in `Stock`, `VoucherItem`, or `Ledger`):
+- **Automatic DOM Protection**: Sastry detects when a related table exceeds the safety threshold (`> 10,000` rows) and automatically limits the initial HTML choice payload to active row IDs + top recent entries, eliminating browser freezes.
+- **Async Autocomplete API**: Queries are debounced and executed on the fly via `/sastry/autocomplete/<app>/<model>/?q=search_term`. Matching results are injected into the datalist dynamically as the user types.
+
+---
+
 ## Native Multi-Tenant SaaS Architecture
 
 In multi-tenant SaaS environments (retail POS, franchise ERPs, multi-entity accounting), exposing monolithic admin interfaces to store staff is a critical security and privacy hazard.

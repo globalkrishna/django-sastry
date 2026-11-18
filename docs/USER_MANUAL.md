@@ -628,6 +628,17 @@ Access to Sastry endpoints is restricted at the view level using `@login_require
 
 ## 8. API Reference
 
+### Declarative Options & Actions API (`sastry.api`)
+
+| Function / Decorator | Signature | Description |
+|---|---|---|
+| `register_model_options(model, ...)` | `(Any, readonly_fields, autocomplete_fields, search_fields, actions) -> None` | Declaratively configures read-only columns, autocomplete search fields, and custom actions for any model. |
+| `@sastry_options(...)` | Class decorator | Annotates a Django Model class with Sastry configuration directly in `models.py`. |
+| `register_action(model, func, name, description)` | `(Any, Callable, str, str) -> None` | Registers a custom bulk action function to be executed from the table toolbar on selected row checkboxes. |
+| `@sastry_action(model, name, description)` | Function decorator | Defines a custom bulk action with signature `(request, queryset) -> dict` returning JSON results. |
+| `get_model_options(app_label, model_name)` | `(str, str) -> dict` | Returns resolved model options merging code registrations with `settings.SASTRY_CONFIG`. |
+| `get_model_actions(app_label, model_name)` | `(str, str) -> list[dict]` | Returns list of action metadata registered for the specified model. |
+
 ### Python Backend Functions (`sastry.dbadmin`)
 
 | Function | Signature | Description |
@@ -635,8 +646,11 @@ Access to Sastry endpoints is restricted at the view level using `@login_require
 | `index(request)` | `(HttpRequest) -> HttpResponse` | Dynamic CRUD index view rendering `s_admin.html` with all registered app models. |
 | `er_view(request)` | `(HttpRequest) -> HttpResponse` | Visual ER Diagram interface rendering `erview/default.html`. |
 | `er_schema_api(request, app_label, model_name)` | `(HttpRequest, str, str) -> JsonResponse` | Returns schema metadata, field types, PK/FK flags, foreign models, and `has_many` child models. |
+| `autocomplete_api(request, app, mdl)` | `(HttpRequest, str, str) -> JsonResponse` | Dynamic debounced Ajax search API returning `[{"id": pk, "label": text}]` for foreign keys. |
+| `model_action_api(request, app, mdl, action_name)` | `(HttpRequest, str, str, str) -> JsonResponse` | Executes registered bulk action on selected record PKs with tenant scoping. |
 | `getData(app, mdl, dat)` | `(str, str, dict) -> dict` | Introspects model, executes paginated/filtered queries, and formats columns and records for the grid. |
-| `optimize_form_querysets(form, rows, max_limit)` | `(Form, list, int) -> Form` | Prevents runaway database queries on foreign key dropdown fields. |
+| `mdlData(app, mdl, dat)` | `(str, str, dict) -> dict` | Complete backend pipeline supporting `dat["show"]`, `dat["rd_only"]`, `dat["restrict"]`, and relations. |
+| `optimize_form_querysets(form, rows, max_limit)` | `(Form, list, int) -> Form` | Prevents runaway database queries and attaches async autocomplete flags on large foreign key tables. |
 
 ### Multi-Tenant Engine API (`sastry.tenant.TenantManager`)
 
