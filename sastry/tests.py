@@ -233,3 +233,119 @@ class SastryManyToManyTests(TestCase):
         assigned_perms = list(created_group.permissions.values_list("pk", flat=True))
         self.assertEqual(sorted(assigned_perms), sorted(test_perm_pks))
 
+
+class SastryModelOptionsAndActionApiTests(TestCase):
+    """Tests for Sastry model configuration options, readonly protection, autocomplete, and custom actions."""
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        User = get_user_model()
+        self.admin_user = User.objects.create_superuser(
+            username="api_admin",
+            email="api_admin@example.com",
+            password="testpassword123",
+        )
+
+    def test_register_model_options_and_retrieval(self):
+        from sastry.api import register_model_options, get_model_options
+
+        register_model_options(
+            "auth.User",
+            readonly_fields=["date_joined", "last_login"],
+            autocomplete_fields=["groups"],
+            search_fields=["username", "email"],
+        )
+
+        opts = get_model_options("auth", "User")
+        self.assertIn("date_joined", opts["readonly_fields"])
+        self.assertIn("last_login", opts["readonly_fields"])
+        self.assertIn("groups", opts["autocomplete_fields"])
+        self.assertIn("username", opts["search_fields"])
+
+    def test_sastry_action_registration_and_execution(self):
+        from sastry.api import sastry_action, get_model_actions, register_action
+        from sastry.dbadmin import model_action_api
+        from django.contrib.auth.models import Group
+
+        g1 = Group.objects.create(name="Alpha")
+        g2 = Group.objects.create(name="Beta")
+
+        @sastry_action(model="auth.Group", description="Prefix Groups with Tag")
+        def prefix_groups(request, queryset):
+            count = 0
+            for g in queryset:
+                g.name = f"TAG_{g.name}"
+                g.save()
+                count += 1
+            return {"success": True, "message": f"Updated {count} groups."}
+
+        actions = get_model_actions("auth", "Group")
+        action_names = [a["name"] for a in actions]
+        self.assertIn("prefix_groups", action_names)
+
+        # Execute action via API
+        request = self.factory.post(
+            "/sastry/action/auth/Group/prefix_groups/",
+            {"pks": json.dumps([g1.pk, g2.pk])},
+        )
+        request.user = self.admin_user
+        response = model_action_api(request, "auth", "Group", "prefix_groups")
+        self.assertEqual(response.status_code, 200)
+        res_data = json.loads(response.content)
+        self.assertTrue(res_data["success"])
+        self.assertIn("Updated 2 groups", res_data["message"])
+
+        g1.refresh_from_db()
+        g2.refresh_from_db()
+        self.assertEqual(g1.name, "TAG_Alpha")
+        self.assertEqual(g2.name, "TAG_Beta")
+
+    def test_autocomplete_api_search(self):
+        from sastry.dbadmin import autocomplete_api
+        from django.contrib.auth.models import Group
+
+        Group.objects.create(name="Accounting Department")
+        Group.objects.create(name="Marketing Team")
+        Group.objects.create(name="Sales Department")
+
+        request = self.factory.get("/sastry/autocomplete/auth/Group/?q=Department")
+        request.user = self.admin_user
+        response = autocomplete_api(request, "auth", "Group")
+        self.assertEqual(response.status_code, 200)
+
+        data = json.loads(response.content)
+        self.assertIn("results", data)
+        results = data["results"]
+        self.assertEqual(len(results), 2)
+        labels = [r["label"] for r in results]
+        self.assertIn("Accounting Department", labels)
+        self.assertIn("Sales Department", labels)
+
+    def test_readonly_fields_prevent_update_in_mdl_post(self):
+        from sastry.api import register_model_options
+        from sastry.dbadmin import mdl_post
+        from django.contrib.auth.models import Group
+
+        grp = Group.objects.create(name="Protected Name")
+        # Register 'name' as readonly for Group
+        register_model_options("auth.Group", readonly_fields=["name"])
+
+        # Attempt to tamper with 'name' via POST
+        payload = {
+            str(grp.pk): {
+                "name": "Hacked Name",
+            }
+        }
+        request = self.factory.post(
+            "/sastry/auth/Group/",
+            {"record_list": json.dumps(payload)},
+        )
+        request.user = self.admin_user
+        response = mdl_post(request, "auth", "Group")
+        self.assertEqual(response.status_code, 200)
+
+        # Name should NOT have changed because it's protected by readonly_fields!
+        grp.refresh_from_db()
+        self.assertEqual(grp.name, "Protected Name")
+
+

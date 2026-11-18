@@ -58,6 +58,8 @@ export declare class db_crud<T extends {
     setTables(data: any): void;
     cellEdit(e: any): false | any[] | null | undefined;
     cellSave(e: any): void;
+    bindAutocompleteInputs(container: HTMLElement): void;
+    executeCustomAction(actionName: string): Promise<void>;
 }
 export declare class AdminerEdit extends db_crud {
     constructor();

@@ -171,6 +171,14 @@ export class db_crud {
         document.getElementById('apply_hide').onclick = (e) => this.hide_columns(e);
         document.getElementById('hide-all').onclick = (e) => this.set_hide(e);
         document.getElementById('download').onclick = (e) => this.download(e);
+        document.querySelectorAll('.sastry-action-item').forEach(el => {
+            el.onclick = (e) => {
+                e.preventDefault();
+                const act = e.currentTarget.getAttribute('data-action');
+                if (act)
+                    this.executeCustomAction(act);
+            };
+        });
         var tooltipTriggerList = Array.from(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
         var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
             return new bootstrap.Tooltip(tooltipTriggerEl);
@@ -760,6 +768,7 @@ export class db_crud {
             document.querySelector('#cru_form #id').value = `new${this.collection.length}`;
         }
         this.setFormHt('Save');
+        this.bindAutocompleteInputs(cruForm);
         cruForm.querySelectorAll('.m2m-container').forEach((container) => {
             const searchInput = container.querySelector('.m2m-filter-input');
             if (searchInput) {
@@ -1085,6 +1094,7 @@ export class db_crud {
                 if (dl) {
                     f.querySelector('form').appendChild(dl.cloneNode(true));
                 }
+                this.bindAutocompleteInputs(f.querySelector('form'));
                 break;
             case 'BooleanField':
             case 'NullBooleanField':
@@ -1150,6 +1160,117 @@ export class db_crud {
             Object.assign(this.collection[ndx.rowIndex - 1], fdt);
         this.FieldEdit.hide();
         this.enb_save();
+    }
+    bindAutocompleteInputs(container) {
+        container.querySelectorAll('input[data-autocomplete]').forEach(inp => {
+            const autoUrl = inp.dataset.autocomplete;
+            if (!autoUrl)
+                return;
+            const eid = inp.id;
+            const rawEid = eid.endsWith('_id') ? eid.slice(0, -3) : eid;
+            let debounceTimer = null;
+            inp.addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(async () => {
+                    const q = inp.value.trim();
+                    try {
+                        const resp = await fetch(`${autoUrl}?q=${encodeURIComponent(q)}`);
+                        const data = await resp.json();
+                        if (data.results) {
+                            const modalDl = inp.parentElement?.querySelector('datalist');
+                            const origDl = document.getElementById(`FK${eid}`) || document.getElementById(`FK${rawEid}`);
+                            data.results.forEach((item) => {
+                                [modalDl, origDl].forEach(dlist => {
+                                    if (dlist) {
+                                        let opt = dlist.querySelector(`option[data-pk="${item.id}"]`);
+                                        if (!opt) {
+                                            opt = document.createElement('option');
+                                            opt.setAttribute('data-pk', String(item.id));
+                                            dlist.appendChild(opt);
+                                        }
+                                        opt.value = item.label;
+                                    }
+                                });
+                                const lkKey = eid.endsWith('_id') ? eid : `${eid}_id`;
+                                if (!this.lkup[lkKey])
+                                    this.lkup[lkKey] = {};
+                                this.lkup[lkKey][item.id] = item.label;
+                                if (!this.lkup[rawEid])
+                                    this.lkup[rawEid] = {};
+                                this.lkup[rawEid][item.id] = item.label;
+                            });
+                        }
+                    }
+                    catch (e) {
+                        console.error('Autocomplete fetch error:', e);
+                    }
+                }, 250);
+            });
+        });
+    }
+    async executeCustomAction(actionName) {
+        const trc = document.querySelectorAll('#index tbody tr input:checked');
+        if (!trc.length) {
+            alert('Nothing Selected\r\nCheck the box');
+            return;
+        }
+        const pks = [];
+        trc.forEach(chk => {
+            const tr = chk.closest('tr');
+            if (tr && tr.rowIndex > 0 && tr.rowIndex <= this.collection.length) {
+                const rowObj = this.collection[tr.rowIndex - 1];
+                if (rowObj && rowObj.id !== undefined && rowObj.id !== null) {
+                    pks.push(rowObj.id);
+                }
+            }
+        });
+        if (!pks.length) {
+            alert('No valid records selected.');
+            return;
+        }
+        const actionBtn = document.querySelector(`.sastry-action-item[data-action="${actionName}"]`);
+        const actionLabel = actionBtn?.textContent?.trim() || actionName;
+        if (!confirm(`Run "${actionLabel}" on ${pks.length} record${pks.length > 1 ? 's' : ''}?`)) {
+            return;
+        }
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        let app = '';
+        let mdl = '';
+        const sastryIdx = pathParts.indexOf('sastry');
+        if (sastryIdx !== -1 && pathParts.length >= sastryIdx + 3) {
+            app = pathParts[sastryIdx + 1];
+            mdl = pathParts[sastryIdx + 2];
+        }
+        else {
+            const formAction = document.getElementById('cru_form')?.getAttribute('action') || '';
+            const fParts = formAction.split('/').filter(Boolean);
+            const fIdx = fParts.indexOf('sastry');
+            if (fIdx !== -1 && fParts.length >= fIdx + 3) {
+                app = fParts[fIdx + 1];
+                mdl = fParts[fIdx + 2];
+            }
+        }
+        if (!app || !mdl) {
+            alert('Could not determine active model for action.');
+            return;
+        }
+        const url = `/sastry/action/${app}/${mdl}/${actionName}/`;
+        const fd = new FormData();
+        fd.append('pks', JSON.stringify(pks));
+        try {
+            const res = await postWithCsrf(url, fd);
+            const data = await res.json();
+            if (data.success) {
+                alert(data.message || 'Action executed successfully.');
+                this.loadPageNum();
+            }
+            else {
+                alert(`Error executing action: ${data.error || 'Failed'}`);
+            }
+        }
+        catch (err) {
+            alert(`Network error executing action: ${err}`);
+        }
     }
 }
 export class AdminerEdit extends db_crud {

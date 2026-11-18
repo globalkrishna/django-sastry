@@ -27,6 +27,18 @@ if (request.user.id in [1]) or (rd_only and k not in rd_only)
     {% endif %}
     <button type="button" class="btn btn-sm btn-outline-primary" id="download" data-bs-toggle="tooltip"
       data-bs-placement="bottom" title="Download"><i class="bi bi-cloud-download"></i></button>
+    {% if actions %}
+    <div class="btn-group btn-group-sm d-inline-block ms-1">
+      <button type="button" class="btn btn-sm btn-outline-info dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" id="btn-custom-actions" title="Run Action on Selected Rows">
+        <i class="bi bi-play-circle-fill"></i> Actions
+      </button>
+      <ul class="dropdown-menu dropdown-menu-dark" id="custom-actions-menu">
+        {% for act in actions %}
+        <li><button type="button" class="dropdown-item sastry-action-item" data-action="{{ act.name }}">{{ act.description }}</button></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
   </div>
   <div class="col-auto">
     {% include 's_pagination.html' %}
@@ -69,40 +81,44 @@ if (request.user.id in [1]) or (rd_only and k not in rd_only)
         {% if rel_form %}
         {% for k in rel_form.data._meta.fields %}
         {% set dis = k.name in rel_form.fields or k.column in rel_form.fields %}
-        {% if not request.user.is_superuser and rd_only and k.column in rd_only %}
+        {% set is_rd = rd_only and (k.name in rd_only or k.column in rd_only) %}
+        {% if is_rd %}
         {% set dis = 'false' %}
         {% endif %}
         <th class="text-center{% if show and k.column not in show%} d-none{% endif %}"
           data-col="{{k.column}},{{k.__class__.__name__}},{{dis}}">
-          {{ k.name.title() | replace('_', ' ') }}</th>
+          {{ k.name.title() | replace('_', ' ') }}{% if is_rd %} <i class="bi bi-lock-fill text-muted" style="font-size: 0.75rem;" title="Read-only"></i>{% endif %}</th>
         {% endfor %}
         {% for k in rel_form.data._meta.many_to_many %}
         {% set dis = k.name in rel_form.fields %}
-        {% if not request.user.is_superuser and rd_only and k.name in rd_only %}
+        {% set is_rd = rd_only and (k.name in rd_only or k.column in rd_only) %}
+        {% if is_rd %}
         {% set dis = 'false' %}
         {% endif %}
         <th class="text-center{% if show and k.name not in show%} d-none{% endif %}"
           data-col="{{k.name}},ManyToManyField,{{dis}}">
-          {{ k.name.title() | replace('_', ' ') }}</th>
+          {{ k.name.title() | replace('_', ' ') }}{% if is_rd %} <i class="bi bi-lock-fill text-muted" style="font-size: 0.75rem;" title="Read-only"></i>{% endif %}</th>
         {% endfor %}
         {% endif %}
         {% for k in mdl_form.data._meta.fields %}
         {% set dis = k.name in mdl_form.fields or k.column in mdl_form.fields %}
-        {% if not request.user.is_superuser and rd_only and k.column in rd_only %}
+        {% set is_rd = rd_only and (k.name in rd_only or k.column in rd_only) %}
+        {% if is_rd %}
         {% set dis = 'false' %}
         {% endif %}
         <th class="text-center{% if show and k.column not in show%} d-none{% endif %}"
           data-col="{{k.column}},{{k.__class__.__name__}},{{dis}}">
-          {{ k.name.title() | replace('_', ' ') }}</th>
+          {{ k.name.title() | replace('_', ' ') }}{% if is_rd %} <i class="bi bi-lock-fill text-muted" style="font-size: 0.75rem;" title="Read-only"></i>{% endif %}</th>
         {% endfor %}
         {% for k in mdl_form.data._meta.many_to_many %}
         {% set dis = k.name in mdl_form.fields %}
-        {% if not request.user.is_superuser and rd_only and k.name in rd_only %}
+        {% set is_rd = rd_only and (k.name in rd_only or k.column in rd_only) %}
+        {% if is_rd %}
         {% set dis = 'false' %}
         {% endif %}
         <th class="text-center{% if show and k.name not in show%} d-none{% endif %}"
           data-col="{{k.name}},ManyToManyField,{{dis}}">
-          {{ k.name.title() | replace('_', ' ') }}</th>
+          {{ k.name.title() | replace('_', ' ') }}{% if is_rd %} <i class="bi bi-lock-fill text-muted" style="font-size: 0.75rem;" title="Read-only"></i>{% endif %}</th>
         {% endfor %}
       </tr>
     </thead>

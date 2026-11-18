@@ -18,6 +18,7 @@ from django.core.paginator import Paginator
 from django.db.utils import IntegrityError
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
+from sastry.api import get_model_options, get_model_actions, get_action_func
 
 try:
     import app.custom as custom
@@ -228,7 +229,12 @@ def index(request):
 
 def optimize_form_querysets(form, rows=None, max_limit=None, request=None, safety_threshold=10000):
     """Ensure foreign key field querysets include all available choices for standard/master models,
-    while protecting against catastrophic memory/DOM crashes on massive transaction tables (> safety_threshold)."""
+    while protecting against catastrophic memory/DOM crashes on massive transaction tables (> safety_threshold)
+    and flagging fields configured for dynamic autocomplete."""
+    owner_model = getattr(form, "_meta", None) and getattr(form._meta, "model", None)
+    owner_opts = get_model_options(owner_model._meta.app_label, owner_model.__name__) if owner_model else {}
+    configured_autocomplete = set(owner_opts.get("autocomplete_fields", []))
+
     for field_name, field in form.fields.items():
         if hasattr(field, "queryset") and field.queryset is not None:
             try:
@@ -243,6 +249,9 @@ def optimize_form_querysets(form, rows=None, max_limit=None, request=None, safet
                             used_ids.add(int(val))
 
                 target_model = field.queryset.model
+                target_app = target_model._meta.app_label
+                target_name = target_model.__name__
+
                 fk_relations = [f.name for f in target_model._meta.fields if f.is_relation and f.many_to_one]
                 if fk_relations:
                     try:
@@ -252,8 +261,16 @@ def optimize_form_querysets(form, rows=None, max_limit=None, request=None, safet
 
                 limit = max_limit or safety_threshold
                 total_count = field.queryset.count()
-                if total_count > limit:
-                    top_n = max_limit if max_limit else 200
+                is_autocomplete = (
+                    field_name in configured_autocomplete
+                    or f"{field_name}_id" in configured_autocomplete
+                    or total_count > limit
+                )
+
+                if is_autocomplete:
+                    field.widget.attrs["data-sastry-autocomplete"] = f"/sastry/autocomplete/{target_app}/{target_name}/"
+                    field.widget.attrs["data-model-name"] = f"{target_app}_{target_name}"
+                    top_n = max_limit if max_limit else 25
                     top_ids = list(field.queryset.order_by("-pk").values_list("pk", flat=True)[:top_n])
                     combined_ids = set(top_ids) | used_ids
                     field.queryset = field.queryset.filter(pk__in=combined_ids)
@@ -263,6 +280,102 @@ def optimize_form_querysets(form, rows=None, max_limit=None, request=None, safet
                 pass
     return form
 
+
+@login_required
+def autocomplete_api(request, app, mdl):
+    """Dynamic Ajax/autocomplete search for ForeignKeys and large models."""
+    if not tenant_manager.is_authorized(request):
+        return HttpResponseForbidden("Access restricted to administrators.")
+    if not tenant_manager.is_model_allowed(request, app, mdl):
+        return HttpResponseForbidden(f"Access to model '{app}.{mdl}' is restricted.")
+
+    try:
+        mdl_cls = apps.get_model(app, mdl)
+    except LookupError:
+        return JsonResponse({"error": f"Model {app}.{mdl} not found."}, status=404)
+
+    query = request.GET.get("q", "").strip()
+    try:
+        limit = min(int(request.GET.get("limit", 25)), 100)
+    except ValueError:
+        limit = 25
+
+    qs = mdl_cls.objects.all()
+    tenant_fltr = tenant_manager.scope_query_filter(request, mdl_cls, {})
+    if tenant_fltr:
+        qs = qs.filter(**tenant_fltr)
+
+    model_opts = get_model_options(app, mdl_cls.__name__)
+    search_fields = model_opts.get("search_fields")
+
+    if query:
+        q_filter = Q()
+        if search_fields:
+            for f in search_fields:
+                q_filter |= Q(**{f"{f}__icontains": query})
+        else:
+            if query.isdigit():
+                q_filter |= Q(pk=query)
+            for f in mdl_cls._meta.concrete_fields:
+                if f.get_internal_type() in ("CharField", "TextField"):
+                    q_filter |= Q(**{f"{f.name}__icontains": query})
+        if q_filter:
+            qs = qs.filter(q_filter)
+
+    ordering = mdl_cls._meta.ordering[0] if mdl_cls._meta.ordering else "-id"
+    try:
+        qs = qs.order_by(ordering)[:limit]
+    except Exception:
+        qs = qs.order_by("-id")[:limit]
+
+    results = []
+    for item in qs:
+        lbl = str(item)
+        results.append({
+            "id": item.pk,
+            "label": lbl,
+            "value": lbl,
+        })
+
+    return JsonResponse({"results": results})
+
+
+@login_required
+def model_action_api(request, app, mdl, action_name):
+    """Execute a registered custom bulk action on selected records."""
+    if not tenant_manager.is_authorized(request):
+        return HttpResponseForbidden("Access restricted to administrators.")
+    if not tenant_manager.is_model_allowed(request, app, mdl):
+        return HttpResponseForbidden(f"Access to model '{app}.{mdl}' is restricted.")
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "POST method required."}, status=405)
+
+    action_func = get_action_func(app, mdl, action_name)
+    if not action_func:
+        return JsonResponse({"success": False, "error": f"Action '{action_name}' not found for {app}.{mdl}."}, status=404)
+
+    try:
+        raw_pks = request.POST.get("pks", "[]")
+        pks = json.loads(raw_pks) if isinstance(raw_pks, str) else raw_pks
+        if not isinstance(pks, list) or not pks:
+            return JsonResponse({"success": False, "error": "No records selected."}, status=400)
+
+        mdl_cls = apps.get_model(app, mdl)
+        qs = mdl_cls.objects.filter(pk__in=pks)
+        tenant_fltr = tenant_manager.scope_query_filter(request, mdl_cls, {})
+        if tenant_fltr:
+            qs = qs.filter(**tenant_fltr)
+
+        result = action_func(request, qs)
+        if isinstance(result, HttpResponse):
+            return result
+        if isinstance(result, dict):
+            if "success" not in result:
+                result["success"] = True
+            return JsonResponse(result)
+        return JsonResponse({"success": True, "message": str(result) if result else "Action executed successfully."})
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
 
 
 @login_required
@@ -284,12 +397,27 @@ def model(request, app, mdl, dat=None, rd_only=None):
     rows_list = data["rows"]
     data["rows"] = json.dumps(rows_list, default=str)
     mdl_cls = apps.get_model(app, mdl)
+    model_opts = get_model_options(app, mdl_cls.__name__)
+    configured_rd_only = set(model_opts.get("readonly_fields", []))
+    for f in mdl_cls._meta.fields:
+        if f.primary_key or getattr(f, "auto_now", False) or getattr(f, "auto_now_add", False):
+            configured_rd_only.add(f.name)
+            configured_rd_only.add(f.column)
+
+    if rd_only:
+        configured_rd_only.update(rd_only)
+    if "rd_only" in dat:
+        configured_rd_only.update(dat["rd_only"])
+    if "readonly" in dat:
+        configured_rd_only.update(dat["readonly"])
+
     data["mdl_form"] = optimize_form_querysets(
         modelform_factory(mdl_cls, exclude=("id",))(mdl_cls()),
         rows=rows_list,
         request=request,
     )
-    data["rd_only"] = [] if rd_only == None else rd_only
+    data["rd_only"] = list(configured_rd_only)
+    data["actions"] = get_model_actions(app, mdl_cls.__name__)
 
     tenant_obj = tenant_manager.resolve_tenant(request)
     if tenant_obj:
@@ -354,6 +482,19 @@ def mdlData(app, mdl, dat):
         data["show"] = dat["show"]
     if "related" in dat:
         data["related"] = dat["related"]
+
+    model_opts = get_model_options(app, mdl.__name__)
+    configured_rd_only = set(model_opts.get("readonly_fields", []))
+    for f in mdl._meta.fields:
+        if f.primary_key or getattr(f, "auto_now", False) or getattr(f, "auto_now_add", False):
+            configured_rd_only.add(f.name)
+            configured_rd_only.add(f.column)
+
+    passed_rd = dat.get("rd_only") or dat.get("readonly") or []
+    configured_rd_only.update(passed_rd)
+
+    data["rd_only"] = list(configured_rd_only)
+    data["actions"] = get_model_actions(app, mdl.__name__)
     return data
 
 
@@ -470,6 +611,13 @@ def mdl_post(request, app, mdl):
         records = json.loads(request.POST["record_list"])
         mdl = apps.get_model(app, mdl)
 
+        model_opts = get_model_options(app, mdl.__name__)
+        rd_fields = set(model_opts.get("readonly_fields", []))
+        for f in mdl._meta.fields:
+            if getattr(f, "auto_now", False) or getattr(f, "auto_now_add", False):
+                rd_fields.add(f.name)
+                rd_fields.add(f.column)
+
         kys = [key for key in records.keys() if key.isdigit()]
         for mod_del in mdl.objects.filter(pk__in=kys):
             # Tenant isolation: ensure user cannot edit records of other stores
@@ -481,6 +629,8 @@ def mdl_post(request, app, mdl):
                 mod_del.delete()
                 continue
             for k in mdl._meta.fields:
+                if k.column == "id" or k.name in rd_fields or k.column in rd_fields:
+                    continue
                 if k.__class__.__name__ == "FileField":
                     continue
                 if k.__class__.__name__ == "ImageField":

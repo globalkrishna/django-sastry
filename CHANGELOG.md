@@ -6,6 +6,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0] - 2026-11-18
+
+### Declarative Options API, Read-Only Protection & Dynamic Autocomplete
+- **Added**:
+  - **Public Configuration API (`sastry.api`)**: Introduced `register_model_options`, `@sastry_options`, `@sastry_action`, `register_action`, and centralized `settings.SASTRY_CONFIG` for declarative model configuration without custom view boilerplate.
+  - **`rd_only` Column Protection**:
+    - Declarative read-only support via `dat["rd_only"]` in `mdlData` and `model` views.
+    - Automatic read-only protection for primary keys (`id`) and auto-timestamp fields (`auto_now`, `auto_now_add`).
+    - Visual lock icon indicators in table headers with inline editing disabled (`dis = 'false'`).
+    - Form inputs rendered `readonly disabled` in CRU edit modal (`base_cru.html`).
+    - Server-side tampering protection in `mdl_post` ensuring read-only fields cannot be overwritten.
+  - **Dynamic Autocomplete Engine**:
+    - Dedicated search endpoint `/sastry/autocomplete/<app>/<model>/?q=...` with multi-tenant row-level scoping.
+    - Debounced typeahead search in spreadsheet cell edit modal and CRU forms.
+  - **Large Table Memory & DOM Protection**:
+    - Safeguards foreign key queries against unbounded choice serialization on massive transaction tables (>10,000 rows like `inventory_stock` and `VoucherItem`), eliminating browser freezes completely.
+  - **Custom Bulk Actions Registry**:
+    - Toolbar dropdown execution across checked row selections via `/sastry/action/<app>/<model>/<action>/`.
+  - **Full Test Suite**: Added comprehensive test coverage for options registration, autocomplete search, custom actions, and read-only enforcement (17/17 tests passing).
+
+---
+
 ## [2.0.7] - 2026-11-18
 
 ### Plain-Text Password Hashing & Superuser Preservation
