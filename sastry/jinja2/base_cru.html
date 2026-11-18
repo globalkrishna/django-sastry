@@ -48,8 +48,7 @@
     <div class="m2m-options-box border rounded bg-white p-2" style="max-height: 180px; overflow-y: auto;">
       {% for vl in v.choices | sort(attribute=1) %}
       <div class="form-check m2m-option py-0 mb-1">
-        <input class="form-check-input m2m-checkbox" type="checkbox" name="{{k}}" id="{{k}}_{{vl[0]}}" value="{{vl[0]}}" data-label="{{vl[1]}}"
-          {% if mdl.data[k] and vl[0] in mdl.data[k] %} checked{% endif %}>
+        <input class="form-check-input m2m-checkbox" type="checkbox" name="{{k}}" id="{{k}}_{{vl[0]}}" value="{{vl[0]}}" data-label="{{vl[1]}}">
         <label class="form-check-label small" for="{{k}}_{{vl[0]}}">{{vl[1]}}</label>
       </div>
       {% endfor %}
