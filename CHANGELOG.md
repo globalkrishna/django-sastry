@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.5] - 2026-11-18
+
+### Unsaved Instance ManyToMany Access Fix
+- **Fixed**:
+  - Resolved `ValueError: "<Model: Model #None>" needs to have a value for field "id" before this many-to-many relationship can be used` when opening models with `ManyToManyField` (such as `app.User`).
+  - Removed instance-level M2M descriptor evaluations in `base_cru.html`; checkbox state continues to be cleanly and dynamically synchronized on the client by `s_crud.ts`.
+
+---
+
 ## [2.0.4] - 2026-11-18
 
 ### Form Foreign Key Optimization & Crash Protection
